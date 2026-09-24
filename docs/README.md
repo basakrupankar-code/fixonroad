@@ -19,24 +19,24 @@ Read in this order:
 
 | # | Document | What it answers |
 |---|---|---|
-| 1 | [PRD](/01-PRD.md) | Who has the problem, why it matters, what the MVP includes **and deliberately excludes** |
-| 2 | [Architecture](/02-ARCHITECTURE.md) | System diagram, tech stack and reasons, data model, booking state machine, realtime design, security |
-| 3 | [API Spec](/03-API-SPEC.md) | Every REST endpoint and Socket.IO event, with auth, examples and errors |
-| 4 | [Requirements](/04-REQUIREMENTS.md) | Prioritised functional and non-functional requirements, acceptance criteria, requirement → screen → API traceability |
-| 5 | [Roadmap](/05-ROADMAP.md) | Ronin plan, milestones for Kenshi / Samurai / Shogun, cut lines, submission checklist |
+| 1 | [PRD] | Who has the problem, why it matters, what the MVP includes **and deliberately excludes** |
+| 2 | [Architecture] | System diagram, tech stack and reasons, data model, booking state machine, realtime design, security |
+| 3 | [API Spec] | Every REST endpoint and Socket.IO event, with auth, examples and errors |
+| 4 | [Requirements] | Prioritised functional and non-functional requirements, acceptance criteria, requirement → screen → API traceability |
+| 5 | [Roadmap] | Ronin plan, milestones for Kenshi / Samurai / Shogun, cut lines, submission checklist |
 
-To edit the sketch, open [excalidraw.com](https://excalidraw.com) and drag in `/screen-flow.excalidraw`.
+To edit the sketch, open [excalidraw.com] and drag in `/screen-flow.excalidraw`.
 
 ## MVP at a glance
 
 **Building:** phone-OTP login · location picker · bike service catalog with fixed prices · nearby mechanics · request → accept/decline (60 s timeout) · live tracking · job status timeline · cash and Razorpay (test mode) payment · ratings · booking history · a minimal mechanic view.
 
-**Not building (yet):** car service · towing · wallet · chat · push notifications · dynamic pricing · admin panel. Reasons are listed in [PRD §5](/01-PRD.md#5-mvp-scope-what-i-will-and-wont-build).
+**Not building (yet):** car service · towing · wallet · chat · push notifications · dynamic pricing · admin panel. Reasons are listed in [PRD §5].
 
 ## Planned tech stack
 
 React + Vite (PWA) · Tailwind · Leaflet/OpenStreetMap · Node.js + Express · Socket.IO · PostgreSQL + PostGIS · Razorpay · Vercel + Render + Neon.
-Justification for each choice: [Architecture §2](/02-ARCHITECTURE.md#2-tech-stack-and-why).
+Justification for each choice: [Architecture §2].
 
 ## Roadmap
 
@@ -47,7 +47,7 @@ Justification for each choice: [Architecture §2](/02-ARCHITECTURE.md#2-tech-sta
 | Samurai | Live tracking, mechanic job flow, payments, reviews |
 | Shogun | Tests, security pass, deployment, polish |
 
-Full milestone tables: [docs/05-ROADMAP.md](/05-ROADMAP.md).
+Full milestone tables: [docs/05-ROADMAP.md].
 
 ## How the documents stay consistent
 
