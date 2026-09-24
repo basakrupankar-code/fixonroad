@@ -24,7 +24,6 @@ Read in this order:
 | 3 | [API Spec](docs/03-API-SPEC.md) | Every REST endpoint and Socket.IO event, with auth, examples and errors |
 | 4 | [Requirements](docs/04-REQUIREMENTS.md) | Prioritised functional and non-functional requirements, acceptance criteria, requirement → screen → API traceability |
 | 5 | [Roadmap](docs/05-ROADMAP.md) | Ronin plan, milestones for Kenshi / Samurai / Shogun, cut lines, submission checklist |
-| ✏️ | [Screen flow (SVG)](/screen-flow.svg) · [Editable Excalidraw](/screen-flow.excalidraw) | 13 customer screens + 5 mechanic screens, with changes from the original UI marked |
 
 To edit the sketch, open [excalidraw.com](https://excalidraw.com) and drag in `/screen-flow.excalidraw`.
 
