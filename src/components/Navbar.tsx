@@ -4,6 +4,32 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Wrench, Menu, X } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 
+// Helper for hash links across pages
+const HashLink = ({ to, children, className, onClick }: any) => {
+  const location = useLocation();
+  const [targetPath, targetHash] = to.split("#");
+
+  const handleClick = (e: any) => {
+    if (onClick) onClick(e);
+    
+    // Check if we are already on the target page
+    const isSamePage = location.pathname === (targetPath || "/");
+    
+    if (isSamePage && targetHash) {
+      e.preventDefault();
+      const el = document.getElementById(targetHash);
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+      window.history.pushState(null, '', `#${targetHash}`);
+    }
+  };
+
+  return (
+    <Link className={className} onClick={handleClick} to={to}>
+      {children}
+    </Link>
+  );
+};
+
 export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mechanic' }) {
   const { theme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
@@ -20,18 +46,18 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   const isMechanic = variant === 'mechanic';
-  const accentColor = isMechanic ? 'text-emerald-400' : 'text-orange-400';
+  const accentColor = 'text-orange-400';
 
   const navLinks = isMechanic
     ? [
         { to: '/', label: 'Switch to Rider/Driver View' },
-        { to: '#benefits', label: 'Benefits', isAnchor: true },
-        { to: '#how', label: 'How it Works', isAnchor: true },
+        { to: '/mechanic#benefits', label: 'Benefits', isAnchor: true },
+        { to: '/mechanic#how-it-works', label: 'How it Works', isAnchor: true },
       ]
     : [
         { to: '/services', label: 'Services' },
         { to: '/mechanic', label: 'For Mechanics' },
-        { to: '#how-it-works', label: 'How it Works', isAnchor: true },
+        { to: '/#how-it-works', label: 'How it Works', isAnchor: true },
       ];
 
   return (
@@ -49,16 +75,14 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
         <div className="max-w-7xl mx-auto px-5 md:px-10 flex justify-between items-center">
           {/* Logo */}
           <Link to={isMechanic ? '/mechanic' : '/'} className="flex items-center gap-2.5 group">
-            <div className={`p-1.5 rounded-lg transition-all duration-300 group-hover:scale-110 ${
-              isMechanic ? 'bg-emerald-500/10' : 'bg-orange-500/10'
-            }`}>
+            <div className="p-1.5 rounded-lg transition-all duration-300 group-hover:scale-110 bg-orange-500/10">
               <Wrench className={`w-6 h-6 ${accentColor}`} />
             </div>
             <span className="text-xl font-bold font-['Outfit'] tracking-tight">
               FixOnRoad<span className={accentColor}>.</span>
             </span>
             {isMechanic && (
-              <span className="ml-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 uppercase tracking-widest">
+              <span className="ml-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20 uppercase tracking-widest">
                 Mechanics
               </span>
             )}
@@ -68,9 +92,9 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
           <div className="hidden md:flex items-center gap-7 text-[15px] font-medium" style={{ color: 'var(--text-secondary)' }}>
             {navLinks.map(link =>
               link.isAnchor ? (
-                <a key={link.label} href={link.to} className="hover:text-[var(--text-primary)] transition-colors duration-200">
+                <HashLink key={link.label} to={link.to} className="hover:text-[var(--text-primary)] transition-colors duration-200">
                   {link.label}
-                </a>
+                </HashLink>
               ) : (
                 <Link
                   key={link.label}
@@ -93,7 +117,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
             <Link
               to="/auth"
               className={`hidden md:inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-                isMechanic ? 'btn-emerald' : 'btn-primary'
+                isMechanic ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/20' : 'btn-primary'
               }`}
             >
               <span className="relative z-10">{isMechanic ? 'Partner Login' : 'Sign In'}</span>
@@ -132,15 +156,15 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
             >
               {navLinks.map(link =>
                 link.isAnchor ? (
-                  <a
+                  <HashLink
                     key={link.label}
-                    href={link.to}
+                    to={link.to}
                     onClick={() => setMobileOpen(false)}
                     className="text-lg font-medium transition-colors"
                     style={{ color: 'var(--text-secondary)' }}
                   >
                     {link.label}
-                  </a>
+                  </HashLink>
                 ) : (
                   <Link
                     key={link.label}
@@ -154,7 +178,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
               )}
               <Link
                 to="/auth"
-                className={`mt-4 text-center ${isMechanic ? 'btn-emerald' : 'btn-primary'}`}
+                className={`mt-4 text-center px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isMechanic ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/20' : 'btn-primary'}`}
               >
                 <span className="relative z-10">{isMechanic ? 'Partner Login' : 'Sign In'}</span>
               </Link>

@@ -17,6 +17,7 @@ import MechanicLanding from "./MechanicLanding";
 import AuthPage from "./pages/AuthPage";
 import ServicesPage from "./pages/ServicesPage";
 import PaymentPage from "./pages/PaymentPage";
+import HowItWorks from "./components/HowItWorks";
 
 /* ══════════════════════════════════════════════
    REUSABLE ANIMATION PRIMITIVES
@@ -176,6 +177,7 @@ function RiderLanding() {
   const [locationState, setLocationState] = useState<'idle' | 'locating' | 'found'>('idle');
 
   useEffect(() => {
+    document.title = "FixOnRoad — On-Demand Roadside Help for Bikes & Cars";
     const seen = sessionStorage.getItem("for_intro_seen");
     if (seen) { setIntroDone(true); setIntroShown(true); }
     else { setIntroShown(true); }
@@ -358,6 +360,8 @@ function RiderLanding() {
         </div>
       </section>
 
+      <HowItWorks />
+
       {/* ════════ MECHANIC PARALLAX SECTION ════════ */}
       <ParallaxImage src="/img-mechanic.jpg" overlay="rgba(13,15,20,0.85)" className="py-36 md:py-48 border-t border-orange-500/10">
         <div className="max-w-7xl mx-auto px-5 md:px-10 lg:px-16 text-center">
@@ -383,8 +387,23 @@ function RiderLanding() {
 }
 
 function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  const { pathname, hash } = useLocation();
+  
+  useEffect(() => {
+    if (hash) {
+      // Small delay ensures page renders before scroll calculation
+      setTimeout(() => {
+        const id = hash.replace('#', '');
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    } else {
+      window.scrollTo(0, 0);
+    }
+  }, [pathname, hash]);
+  
   return null;
 }
 

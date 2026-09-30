@@ -68,6 +68,9 @@ export default function MechanicLanding() {
 
   useEffect(() => {
     document.title = "Partner With FixOnRoad — Earn on Your Schedule in West Bengal";
+    counter1.start();
+    counter2.start();
+    counter3.start();
   }, []);
 
   const testimonials = [
@@ -117,7 +120,7 @@ export default function MechanicLanding() {
               Start Earning Today
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <a href="#how" className="btn-secondary flex items-center gap-2 text-[15px]">
+            <a href="#how-it-works" className="btn-secondary flex items-center gap-2 text-[15px]">
               See How It Works
               <ChevronDown className="w-4 h-4 animate-bounce" />
             </a>
@@ -231,7 +234,7 @@ export default function MechanicLanding() {
       </motion.main>
 
       {/* Benefits */}
-      <section id="benefits" className="relative z-10 py-16 sm:py-20 px-5 md:px-10" style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border-primary)', borderBottom: '1px solid var(--border-primary)' }}>
+      <section id="benefits" className="scroll-mt-24 relative z-10 py-16 sm:py-20 px-5 md:px-10" style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border-primary)', borderBottom: '1px solid var(--border-primary)' }}>
         <div className="max-w-7xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-14">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold font-['Outfit'] mb-4">Why Mechanics <span className="text-gradient-emerald">Love Us</span></h2>
@@ -267,7 +270,7 @@ export default function MechanicLanding() {
       </section>
 
       {/* How It Works */}
-      <section id="how" className="relative z-10 py-16 sm:py-20 px-5 md:px-10">
+      <section id="how-it-works" className="scroll-mt-24 relative z-10 py-16 sm:py-20 px-5 md:px-10">
         <div className="max-w-5xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-14">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold font-['Outfit'] mb-4">Start in <span className="text-gradient-emerald">3 Steps</span></h2>
