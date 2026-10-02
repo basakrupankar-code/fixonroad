@@ -18,6 +18,7 @@ import AuthPage from "./pages/AuthPage";
 import ServicesPage from "./pages/ServicesPage";
 import PaymentPage from "./pages/PaymentPage";
 import HowItWorks from "./components/HowItWorks";
+import NotFoundPage from "./pages/NotFoundPage";
 
 /* ══════════════════════════════════════════════
    REUSABLE ANIMATION PRIMITIVES
@@ -418,6 +419,7 @@ export default function App() {
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/payment" element={<PaymentPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
