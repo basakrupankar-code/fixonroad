@@ -41,9 +41,9 @@ The app implements three primary, fully functional flows supported by internal d
 
 ## 📸 Screenshot Gallery (15 pts)
 
-| Desktop View (Dark Mode) | Mobile Layout (375px) | Empty Search State |
-| :---: | :---: | :---: |
-| <img src="./docs/screenshots/desktop-dark.png" width="300" alt="Desktop Dark Mode" /> | <img src="./docs/screenshots/mobile-view.png" width="200" alt="Mobile Layout" /> | <img src="./docs/screenshots/empty.png" width="300" alt="Empty State" /> |
+| Desktop View (Dark Mode) | Mobile Layout (375px) | Empty Search State | 404 Error Page |
+| :---: | :---: | :---: | :---: |
+| <img src="./docs/screenshots/desktop-dark.png" width="300" alt="Desktop Dark Mode" /> | <img src="./docs/screenshots/mobile-view.png" width="200" alt="Mobile Layout" /> | <img src="./docs/screenshots/empty.png" width="300" alt="Empty State" /> | <img src="./docs/screenshots/errors.png" width="300" alt="404 Error Page" /> |
 
 ## 🛠️ Deployment & Setup (15 pts)
 The application is structured as a standard Vite + React SPA.
