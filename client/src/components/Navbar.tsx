@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wrench, Menu, X } from 'lucide-react';
+import { Wrench, Menu, X, Globe } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from '../context/AuthContext';
 
@@ -34,6 +35,7 @@ const HashLink = ({ to, children, className, onClick }: any) => {
 export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mechanic' }) {
   const { theme } = useTheme();
   const { user, isAuthenticated, logout } = useAuth();
+  const { t, i18n } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -113,6 +115,19 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
 
           {/* Right Actions */}
           <div className="flex items-center gap-3">
+            {/* Language Selector */}
+            <div className="relative group">
+              <button className="flex items-center gap-1.5 p-2 rounded-xl hover:bg-white/5 transition-colors text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                <Globe className="w-4 h-4" />
+                <span className="hidden md:inline uppercase">{i18n.language}</span>
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-32 py-2 rounded-xl bg-[#1A1D24] border border-white/10 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                <button onClick={() => i18n.changeLanguage('en')} className={`w-full text-left px-4 py-2 text-sm hover:bg-white/5 ${i18n.language === 'en' ? 'text-orange-400' : 'text-gray-300'}`}>English</button>
+                <button onClick={() => i18n.changeLanguage('bn')} className={`w-full text-left px-4 py-2 text-sm hover:bg-white/5 ${i18n.language === 'bn' ? 'text-orange-400' : 'text-gray-300'}`}>Bengali</button>
+                <button onClick={() => i18n.changeLanguage('hi')} className={`w-full text-left px-4 py-2 text-sm hover:bg-white/5 ${i18n.language === 'hi' ? 'text-orange-400' : 'text-gray-300'}`}>Hindi</button>
+              </div>
+            </div>
+
             {/* User Profile / Logout or Sign In */}
             {isAuthenticated && user ? (
               <div className="hidden md:flex items-center gap-4">

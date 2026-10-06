@@ -37,6 +37,7 @@ The app implements three primary, fully functional flows supported by internal d
 1. **Rider Assistance Request Flow**: Users select their vehicle (Bike/Car) and exact issue (Flat Tire, Dead Battery, Towing), fetching precise upfront transparent pricing (e.g., ₹150 + GST).
 2. **Mechanic Onboarding & Dashboard**: A dedicated portal (`/mechanic`) demonstrating real-time earning projections, onboarding criteria, and live mock "incoming requests" mimicking driver dispatch logic.
 3. **Live Radar Search (Simulated)**: Searching for mechanics initiates a realistic, stateful delay resolving to a matched professional with an ETA.
+4. **Multi-Language Support (i18n)**: The entire website is now fully localized and available in English, Bengali, and Hindi at all times. Users can seamlessly switch languages using the global language selector in the navigation bar.
 *Note: Real data connection is fulfilled via structured local JSON arrays mimicking a REST endpoint, including graceful error handling and fallback UI rendering when filtering yields zero results.*
 
 ## 📸 Screenshot Gallery (15 pts)
