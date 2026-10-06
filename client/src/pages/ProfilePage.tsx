@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User as UserIcon, Mail, Phone, MapPin, Hash, Activity, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { User as UserIcon, Mail, Phone, MapPin, Hash, Activity, Save, AlertCircle, CheckCircle2, Key } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -20,6 +20,8 @@ export default function ProfilePage() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [passwordData, setPasswordData] = useState({ password: '', confirmPassword: '' });
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   useEffect(() => {
     if (!isAuthLoading && !isAuthenticated) {
@@ -64,6 +66,38 @@ export default function ProfilePage() {
       setError(err.message);
     } finally {
       setSaveLoading(false);
+    }
+  };
+
+  const handlePasswordSave = async () => {
+    if (passwordData.password !== passwordData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    if (passwordData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+    setPasswordLoading(true);
+    try {
+      const res = await fetch('/api/v1/me/password', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password: passwordData.password })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || 'Failed to update password');
+      setSuccess('Password updated successfully');
+      setPasswordData({ password: '', confirmPassword: '' });
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -246,6 +280,44 @@ export default function ProfilePage() {
               </div>
             </div>
             
+            <div className="pt-6 mt-6 border-t border-white/10">
+              <h3 className="text-lg font-bold text-white mb-4">Security</h3>
+              <div className="grid sm:grid-cols-2 gap-5 mb-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-400 block mb-1.5">New Password</label>
+                  <div className="relative">
+                    <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <input
+                      type="password"
+                      placeholder="At least 6 characters"
+                      value={passwordData.password}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, password: e.target.value }))}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl h-11 pl-10 pr-4 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-400 block mb-1.5">Confirm Password</label>
+                  <div className="relative">
+                    <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <input
+                      type="password"
+                      placeholder="Confirm new password"
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl h-11 pl-10 pr-4 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handlePasswordSave}
+                disabled={passwordLoading || !passwordData.password}
+                className="px-4 py-2 rounded-xl text-sm font-bold text-orange-500 bg-orange-500/10 hover:bg-orange-500/20 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {passwordLoading ? 'Updating...' : 'Set / Update Password'}
+              </button>
+            </div>
             <div className="pt-6 mt-6 border-t border-white/10">
               <button 
                 onClick={logout}

@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { User } from '../models/User';
 import { requireAuth } from '../middleware/auth';
+import bcrypt from 'bcryptjs';
+import { z } from 'zod';
+
+const PasswordSchema = z.object({
+  password: z.string().min(6, 'Password must be at least 6 characters')
+});
 
 const router = Router();
 
@@ -37,6 +43,23 @@ router.patch('/', async (req, res, next) => {
       { new: true, runValidators: true }
     );
     res.json({ id: user?._id, name: user?.name, email: user?.email, phone: user?.phone, role: user?.role, username: user?.username, city: user?.city, age: user?.age });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/password', async (req, res, next) => {
+  try {
+    const { password } = PasswordSchema.parse(req.body);
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    await User.findByIdAndUpdate(
+      req.user?.userId,
+      { $set: { password: hashedPassword } },
+      { runValidators: true }
+    );
+    
+    res.json({ message: 'Password updated successfully' });
   } catch (error) {
     next(error);
   }
