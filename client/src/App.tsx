@@ -11,12 +11,14 @@ import {
   Clock, MapPin, Wrench, Star, Crosshair, Droplets, Battery, Link2, Cog
 } from "lucide-react";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { AuthProvider } from './context/AuthContext';
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import MechanicLanding from "./MechanicLanding";
 import AuthPage from "./pages/AuthPage";
 import ServicesPage from "./pages/ServicesPage";
 import PaymentPage from "./pages/PaymentPage";
+import ProfilePage from "./pages/ProfilePage";
 import HowItWorks from "./components/HowItWorks";
 import NotFoundPage from "./pages/NotFoundPage";
 
@@ -411,17 +413,20 @@ function ScrollToTop() {
 export default function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <ScrollToTop />
-        <Routes>
-          <Route path="/" element={<RiderLanding />} />
-          <Route path="/mechanic" element={<MechanicLanding />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/services" element={<ServicesPage />} />
-          <Route path="/payment" element={<PaymentPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <ScrollToTop />
+          <Routes>
+            <Route path="/" element={<RiderLanding />} />
+            <Route path="/mechanic" element={<MechanicLanding />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/services" element={<ServicesPage />} />
+            <Route path="/payment" element={<PaymentPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

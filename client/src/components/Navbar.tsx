@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wrench, Menu, X } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
+import { useAuth } from '../context/AuthContext';
 
 // Helper for hash links across pages
 const HashLink = ({ to, children, className, onClick }: any) => {
@@ -32,6 +33,7 @@ const HashLink = ({ to, children, className, onClick }: any) => {
 
 export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mechanic' }) {
   const { theme } = useTheme();
+  const { user, isAuthenticated, logout } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -111,17 +113,29 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
 
           {/* Right Actions */}
           <div className="flex items-center gap-3">
-
-
-            {/* Sign In / Partner Login */}
-            <Link
-              to="/auth"
-              className={`hidden md:inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-                isMechanic ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/20' : 'btn-primary'
-              }`}
-            >
-              <span className="relative z-10">{isMechanic ? 'Partner Login' : 'Sign In'}</span>
-            </Link>
+            {/* User Profile / Logout or Sign In */}
+            {isAuthenticated && user ? (
+              <div className="hidden md:flex items-center gap-4">
+                <Link to="/profile" className="text-sm font-semibold hover:text-orange-400 transition-colors" style={{ color: 'var(--text-primary)' }}>
+                  {user.name || user.phone}
+                </Link>
+                <button
+                  onClick={logout}
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/auth"
+                className={`hidden md:inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                  isMechanic ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/20' : 'btn-primary'
+                }`}
+              >
+                <span className="relative z-10">{isMechanic ? 'Partner Login' : 'Sign In'}</span>
+              </Link>
+            )}
 
             {/* Mobile Hamburger */}
             <button
@@ -176,12 +190,28 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   </Link>
                 )
               )}
-              <Link
-                to="/auth"
-                className={`mt-4 text-center px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isMechanic ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/20' : 'btn-primary'}`}
-              >
-                <span className="relative z-10">{isMechanic ? 'Partner Login' : 'Sign In'}</span>
-              </Link>
+              {isAuthenticated && user ? (
+                <div className="mt-4 text-center">
+                  <div className="mb-2">
+                    <Link to="/profile" onClick={() => setMobileOpen(false)} className="text-sm font-semibold hover:text-orange-400 transition-colors" style={{ color: 'var(--text-primary)' }}>
+                      {user.name || user.phone}
+                    </Link>
+                  </div>
+                  <button
+                    onClick={() => { logout(); setMobileOpen(false); }}
+                    className="w-full px-5 py-2.5 rounded-xl text-sm font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors"
+                  >
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  to="/auth"
+                  className={`mt-4 text-center px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isMechanic ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/20' : 'btn-primary'}`}
+                >
+                  <span className="relative z-10">{isMechanic ? 'Partner Login' : 'Sign In'}</span>
+                </Link>
+              )}
             </motion.div>
           </motion.div>
         )}
