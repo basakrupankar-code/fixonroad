@@ -1,79 +1,47 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import jwt from 'jsonwebtoken';
-import { generateToken } from '../utils/jwt';
 import { User } from '../models/User';
-import { Otp } from '../models/Otp';
+import { Session } from '../models/Session';
 import { Mechanic } from '../models/Mechanic';
 import { sendEmail } from '../utils/mailer';
-import { sendSMS, requestTwilioVerify, checkTwilioVerify } from '../utils/sms';
 import { adminAuth } from '../utils/firebaseAdmin';
 import bcrypt from 'bcryptjs';
-import { authenticator } from 'otplib';
+import crypto from 'crypto';
 
 const router = Router();
-
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey';
 
 const RegisterSchema = z.object({
   email: z.string().email('Invalid email address'),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number format').optional(),
   username: z.string().min(3, 'Username must be at least 3 characters'),
-  password: z.string().optional(),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
   age: z.number().min(16, 'You must be at least 16 years old'),
   city: z.string().min(2, 'City is required'),
   acceptedCookies: z.boolean().refine(val => val === true, 'You must accept cookies'),
   role: z.enum(['customer', 'mechanic'])
-}).superRefine((data, ctx) => {
-  if (data.password) {
-    if (data.password.length < 12) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Password must contain at least 12 characters', path: ['password'] });
-    }
-    if (!/[a-z]/.test(data.password) || !/[A-Z]/.test(data.password)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Password must contain both lower and upper case letters', path: ['password'] });
-    }
-    if (!/[0-9]/.test(data.password) && !/[^A-Za-z0-9]/.test(data.password)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Password must contain at least one number or symbol', path: ['password'] });
-    }
-    if (data.email && data.password.toLowerCase().includes(data.email.split('@')[0].toLowerCase())) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Password must not contain your email address', path: ['password'] });
-    }
-    const COMMON_PASSWORDS = [
-      'password', 'password123', '123456', '12345678', '123456789', 
-      '1234567890', 'qwerty', 'qwertyuiop', 'admin', 'admin123'
-    ];
-    if (COMMON_PASSWORDS.some(cp => data.password!.toLowerCase().includes(cp))) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Password is commonly used', path: ['password'] });
-    }
-  }
 });
 
-const RequestOtpSchema = z.object({
-  identifier: z.string().min(3, 'Email or phone number is required')
-});
+const generateSession = async (userId: any, res: any) => {
+  const sessionToken = crypto.randomBytes(32).toString('hex');
+  const maxAgeMs = 7 * 24 * 60 * 60 * 1000; // 7 days
+  const expiresAt = new Date(Date.now() + maxAgeMs);
 
-const VerifyOtpSchema = z.object({
-  identifier: z.string(),
-  otp: z.string().length(6)
-});
+  await Session.create({
+    userId,
+    sessionToken,
+    expiresAt
+  });
 
-const ResetPasswordWithTokenSchema = z.object({
-  resetToken: z.string(),
-  password: z.string()
-}).superRefine((data, ctx) => {
-  if (data.password.length < 12) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Password must contain at least 12 characters', path: ['password'] });
-  }
-  if (!/[a-z]/.test(data.password) || !/[A-Z]/.test(data.password)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Password must contain both lower and upper case letters', path: ['password'] });
-  }
-  if (!/[0-9]/.test(data.password) && !/[^A-Za-z0-9]/.test(data.password)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Password must contain at least one number or symbol', path: ['password'] });
-  }
-});
+  res.cookie('session_token', sessionToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: maxAgeMs
+  });
+};
 
-// 1. Register endpoint (creates user and sends verification email)
+// 1. Register endpoint
 router.post('/register', async (req, res, next) => {
   try {
     const data = RegisterSchema.parse(req.body);
@@ -86,49 +54,40 @@ router.post('/register', async (req, res, next) => {
       return res.status(400).json({ error: { code: 'USER_EXISTS', message: 'Email, phone, or username already exists' } });
     }
 
-    let hashedPassword;
-    if (data.password) {
-      hashedPassword = await bcrypt.hash(data.password, 10);
-    }
+    const hashedPassword = await bcrypt.hash(data.password, 10);
 
     const user = await User.create({
       ...data,
       password: hashedPassword,
-      isEmailVerified: false
+      isEmailVerified: true // For simplicity in this new auth system, auto-verify or handle later
     });
 
-    // If mechanic, create mechanic record
     if (user.role === 'mechanic') {
       await Mechanic.create({ userId: user._id });
     }
 
-    // Generate Email Verification Token
-    const verificationToken = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, { expiresIn: '1h' });
-    const verificationLink = `http://localhost:5000/api/v1/auth/verify-email?token=${verificationToken}`;
+    await generateSession(user._id, res);
 
-    // Send Real Email
-    const emailSubject = 'Verify your FixOnRoad Account';
-    const emailHtml = `
-      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eaeaea; border-radius: 8px; padding: 20px;">
-        <h2 style="color: #f97316;">FixOnRoad</h2>
-        <p>Hi ${user.name},</p>
-        <p>Thanks for joining FixOnRoad! Please verify your email address by clicking the button below.</p>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${verificationLink}" style="background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Verify Email</a>
-        </div>
-        <p style="font-size: 12px; color: #888;">If you didn't request this, you can safely ignore this email.</p>
-      </div>
-    `;
-    
-    await sendEmail(user.email, emailSubject, emailHtml);
-
-    res.json({ message: 'Registration successful. Please check your email to verify your account.' });
+    res.status(201).json({ 
+      success: true,
+      message: 'Registration successful',
+      user: {
+        id: user._id, 
+        phone: user.phone, 
+        name: user.name, 
+        email: user.email,
+        username: user.username,
+        city: user.city,
+        age: user.age,
+        role: user.role
+      }
+    });
   } catch (error) {
     next(error);
   }
 });
 
-// 1.5. Password login endpoint
+// 2. Login endpoint
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -150,25 +109,11 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).json({ error: { message: 'Invalid credentials' } });
     }
 
-    if (user.isTwoFactorEnabled) {
-      // Generate a temporary token that expires in 5 minutes
-      const tempToken = jwt.sign({ pending2FAUserId: user._id.toString() }, JWT_SECRET, { expiresIn: '5m' });
-      return res.json({ require2FA: true, tempToken });
-    }
-
-    // Generate JWT
-    const token = generateToken({ userId: user._id.toString(), role: user.role });
-
-    // Set secure HTTP-only cookie
-    res.cookie('jwt', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
+    await generateSession(user._id, res);
 
     res.json({
-      token, 
+      success: true,
+      message: 'Logged in successfully',
       user: { 
         id: user._id, 
         phone: user.phone, 
@@ -177,8 +122,7 @@ router.post('/login', async (req, res, next) => {
         username: user.username,
         city: user.city,
         age: user.age,
-        role: user.role,
-        isTwoFactorEnabled: user.isTwoFactorEnabled
+        role: user.role
       }
     });
   } catch (error) {
@@ -186,253 +130,67 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-// 1.6. Verify 2FA token
-router.post('/login/2fa', async (req, res, next) => {
+// 3. Logout endpoint
+router.post('/logout', async (req, res, next) => {
   try {
-    const { tempToken, code } = req.body;
-    if (!tempToken || !code) {
-      return res.status(400).json({ error: { message: 'Token and code are required' } });
+    const token = req.cookies.session_token;
+    if (token) {
+      await Session.findOneAndDelete({ sessionToken: token });
     }
 
-    const payload = jwt.verify(tempToken, JWT_SECRET) as { pending2FAUserId: string };
-    const user = await User.findById(payload.pending2FAUserId);
-
-    if (!user || !user.isTwoFactorEnabled || !user.twoFactorSecret) {
-      return res.status(401).json({ error: { message: '2FA setup is incomplete or invalid user' } });
-    }
-
-    const isValid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
-    if (!isValid) {
-      return res.status(401).json({ error: { message: 'Invalid authenticator code' } });
-    }
-
-    // Generate JWT
-    const token = generateToken({ userId: user._id.toString(), role: user.role });
-
-    // Set secure HTTP-only cookie
-    res.cookie('jwt', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    res.clearCookie('session_token', { 
+      httpOnly: true, 
+      secure: process.env.NODE_ENV === 'production', 
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' 
     });
 
-    res.json({
-      token, 
-      user: { 
-        id: user._id, 
-        phone: user.phone, 
-        name: user.name, 
-        email: user.email,
-        username: user.username,
-        city: user.city,
-        age: user.age,
-        role: user.role,
-        isTwoFactorEnabled: user.isTwoFactorEnabled
-      }
-    });
-  } catch (error) {
-    res.status(401).json({ error: { message: 'Invalid or expired temporary token' } });
-  }
-});
-
-// 2. Email verification endpoint
-router.get('/verify-email', async (req, res, next) => {
-  try {
-    const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
-    const { token } = req.query;
-    
-    if (!token || typeof token !== 'string') {
-      return res.redirect(`${clientOrigin}/auth?error=InvalidToken`);
-    }
-
-    const payload = jwt.verify(token, JWT_SECRET) as { userId: string };
-    const user = await User.findById(payload.userId);
-
-    if (!user) {
-      return res.redirect(`${clientOrigin}/auth?error=UserNotFound`);
-    }
-
-    user.isEmailVerified = true;
-    await user.save();
-
-    // Redirect to frontend auth page with verified status
-    res.redirect(`${clientOrigin}/auth?verified=true`);
-  } catch (error) {
-    const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
-    res.redirect(`${clientOrigin}/auth?error=VerificationFailed`);
-  }
-});
-
-// 3. Request OTP (only for verified, existing users)
-router.post('/otp/request', async (req, res, next) => {
-  try {
-    const { identifier } = RequestOtpSchema.parse(req.body);
-    
-    const user = await User.findOne({ $or: [{ phone: identifier }, { email: identifier }] });
-    
-    if (!user) {
-      return res.status(404).json({ error: { code: 'USER_NOT_FOUND', message: 'User not found. Please register first.' } });
-    }
-    
-    if (!user.isEmailVerified && user.email === identifier) {
-      return res.status(403).json({ error: { code: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email before logging in.' } });
-    }
-
-    const isEmail = identifier.includes('@');
-    if (isEmail) {
-      return res.status(400).json({ error: { message: 'Email-based OTP is disabled. Please use your phone number.' } });
-    }
-    
-    // Try sending with Twilio Verify first
-    const usedTwilioVerify = await requestTwilioVerify(identifier);
-    if (usedTwilioVerify) {
-      return res.json({ message: 'OTP sent via Twilio Verify', expiresInSeconds: 300 });
-    }
-
-    // Fallback: Generate 6-digit OTP locally if Twilio Verify isn't set up
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-
-    // Upsert into Otp collection
-    await Otp.findOneAndUpdate(
-      { identifier },
-      { otp, expiresAt },
-      { upsert: true, new: true }
-    );
-
-    // Send SMS
-    await sendSMS(identifier, `Your FixOnRoad verification code is ${otp}. It expires in 5 minutes.`);
-
-    res.json({ message: 'OTP sent via SMS', expiresInSeconds: 300 });
+    res.status(200).json({ success: true, message: 'Logged out successfully.' });
   } catch (error) {
     next(error);
   }
 });
 
-// 4. Verify OTP and login
-router.post('/otp/verify', async (req, res, next) => {
-  try {
-    const { identifier, otp } = VerifyOtpSchema.parse(req.body);
-
-    // First try checking with Twilio Verify
-    const isTwilioVerified = await checkTwilioVerify(identifier, otp);
-    
-    if (!isTwilioVerified) {
-      // Fallback to checking local OTP collection
-      const otpRecord = await Otp.findOne({ identifier, otp, expiresAt: { $gt: new Date() } });
-
-      if (!otpRecord) {
-        return res.status(400).json({ error: { code: 'INVALID_OTP', message: 'Invalid or expired OTP' } });
-      }
-
-      // Delete OTP after successful use
-      await Otp.deleteOne({ identifier });
-    }
-
-    // Find user
-    const user = await User.findOne({ $or: [{ phone: identifier }, { email: identifier }] });
-    if (!user) {
-      return res.status(404).json({ error: { code: 'USER_NOT_FOUND', message: 'User not found' } });
-    }
-
-    if (user.isTwoFactorEnabled) {
-      // Generate a temporary token that expires in 5 minutes
-      const tempToken = jwt.sign({ pending2FAUserId: user._id.toString() }, JWT_SECRET, { expiresIn: '5m' });
-      return res.json({ require2FA: true, tempToken });
-    }
-
-    // Generate JWT
-    const token = generateToken({ userId: user._id.toString(), role: user.role });
-
-    // Set secure HTTP-only cookie
-    res.cookie('jwt', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
-
-    res.json({
-      token, 
-      user: { 
-        id: user._id, 
-        phone: user.phone, 
-        name: user.name, 
-        email: user.email,
-        username: user.username,
-        city: user.city,
-        age: user.age,
-        role: user.role,
-        isTwoFactorEnabled: user.isTwoFactorEnabled
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// 5. Google Auth login / register via Firebase ID Token
+// 4. Google Auth login
 router.post('/google-login', async (req, res, next) => {
   try {
-    const { idToken, role } = req.body; // role only matters if it's a new user
+    const { idToken, role } = req.body;
 
     if (!idToken) {
       return res.status(400).json({ error: { code: 'NO_TOKEN', message: 'No ID token provided' } });
     }
 
-    // Verify token with Firebase Admin
     const decodedToken = await adminAuth.verifyIdToken(idToken);
-    const { email, name, picture } = decodedToken;
+    const { email, name } = decodedToken;
 
     if (!email) {
       return res.status(400).json({ error: { code: 'NO_EMAIL', message: 'Google account has no email' } });
     }
 
-    // Find if user already exists
     let user = await User.findOne({ email });
 
     if (!user) {
-      // Create new user. By default, assign 'customer' if role not provided
       user = await User.create({
         email,
         name: name || 'Google User',
-        isEmailVerified: true, // Auto-verified by Google
+        isEmailVerified: true,
         role: role === 'mechanic' ? 'mechanic' : 'customer',
-        acceptedCookies: true, // We assume they accept cookies if they use Google login
+        acceptedCookies: true,
       });
 
       if (user.role === 'mechanic') {
         await Mechanic.create({ userId: user._id });
       }
     } else {
-      // Optionally update the name if it was empty before
       if (!user.name) {
         user.name = name || 'Google User';
         await user.save();
       }
     }
 
-    if (user.isTwoFactorEnabled) {
-      // Generate a temporary token that expires in 5 minutes
-      const tempToken = jwt.sign({ pending2FAUserId: user._id.toString() }, JWT_SECRET, { expiresIn: '5m' });
-      return res.json({ require2FA: true, tempToken });
-    }
-
-    // Generate JWT
-    const token = generateToken({ userId: user._id.toString(), role: user.role });
-
-    // Set secure HTTP-only cookie
-    res.cookie('jwt', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
+    await generateSession(user._id, res);
 
     res.json({
-      token, 
+      success: true,
       user: { 
         id: user._id, 
         phone: user.phone, 
@@ -441,149 +199,12 @@ router.post('/google-login', async (req, res, next) => {
         username: user.username,
         city: user.city,
         age: user.age,
-        role: user.role,
-        isTwoFactorEnabled: user.isTwoFactorEnabled
+        role: user.role
       }
     });
   } catch (error: any) {
     console.error('Firebase Auth error:', error);
     res.status(401).json({ error: { code: 'INVALID_TOKEN', message: 'Invalid or expired Google token' } });
-  }
-});
-
-// 6. Request OTP for Forgot Password
-router.post('/forgot-password/request', async (req, res, next) => {
-  try {
-    const { identifier } = RequestOtpSchema.parse(req.body);
-    
-    const user = await User.findOne({ $or: [{ phone: identifier }, { email: identifier }] });
-    if (!user) {
-      return res.status(404).json({ error: { code: 'USER_NOT_FOUND', message: 'User not found.' } });
-    }
-
-    const isEmail = identifier.includes('@');
-    if (isEmail) {
-      return res.status(400).json({ error: { message: 'Email-based OTP is disabled. Please use your phone number.' } });
-    }
-    
-    // Try sending with Twilio Verify first
-    const usedTwilioVerify = await requestTwilioVerify(identifier);
-    if (usedTwilioVerify) {
-      return res.json({ message: 'Password reset OTP sent', expiresInSeconds: 300 });
-    }
-
-    // Fallback locally
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
-
-    await Otp.findOneAndUpdate(
-      { identifier },
-      { otp, expiresAt },
-      { upsert: true, new: true }
-    );
-
-    if (isEmail) {
-      await sendEmail(identifier, 'FixOnRoad Password Reset', `Your FixOnRoad password reset code is ${otp}. It expires in 5 minutes.`);
-    } else {
-      await sendSMS(identifier, `Your FixOnRoad verification code is ${otp}. It expires in 5 minutes.`);
-    }
-
-    res.json({ message: 'Password reset OTP sent', expiresInSeconds: 300 });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// 7. Verify OTP for Password Reset
-router.post('/forgot-password/verify', async (req, res, next) => {
-  try {
-    const { identifier, otp } = VerifyOtpSchema.parse(req.body);
-
-    const isTwilioVerified = await checkTwilioVerify(identifier, otp);
-    
-    if (!isTwilioVerified) {
-      const otpRecord = await Otp.findOne({ identifier, otp, expiresAt: { $gt: new Date() } });
-      if (!otpRecord) {
-        return res.status(400).json({ error: { code: 'INVALID_OTP', message: 'Invalid or expired OTP' } });
-      }
-      await Otp.deleteOne({ identifier });
-    }
-
-    const user = await User.findOne({ $or: [{ phone: identifier }, { email: identifier }] });
-    if (!user) {
-      return res.status(404).json({ error: { code: 'USER_NOT_FOUND', message: 'User not found' } });
-    }
-
-    const resetToken = jwt.sign({ resetUserId: user._id.toString() }, JWT_SECRET, { expiresIn: '15m' });
-
-    res.json({ message: 'OTP verified', resetToken });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// 8. Set New Password and Login
-router.post('/forgot-password/reset', async (req, res, next) => {
-  try {
-    const { resetToken, password } = ResetPasswordWithTokenSchema.parse(req.body);
-
-    let payload;
-    try {
-      payload = jwt.verify(resetToken, JWT_SECRET) as { resetUserId: string };
-    } catch (e) {
-      return res.status(400).json({ error: { code: 'INVALID_TOKEN', message: 'Invalid or expired reset session. Please request a new OTP.' } });
-    }
-
-    const user = await User.findById(payload.resetUserId);
-    if (!user) {
-      return res.status(404).json({ error: { code: 'USER_NOT_FOUND', message: 'User not found' } });
-    }
-
-    if (user.email && password.toLowerCase().includes(user.email.split('@')[0].toLowerCase())) {
-      return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'Password must not contain your email address' } });
-    }
-
-    const COMMON_PASSWORDS = ['password', 'password123', '123456', '12345678', '123456789', '1234567890', 'qwerty', 'qwertyuiop', 'admin', 'admin123'];
-    if (COMMON_PASSWORDS.some(cp => password.toLowerCase().includes(cp))) {
-      return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'Password is commonly used' } });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    user.password = hashedPassword;
-    await user.save();
-
-    if (user.isTwoFactorEnabled) {
-      const tempToken = jwt.sign({ pending2FAUserId: user._id.toString() }, JWT_SECRET, { expiresIn: '5m' });
-      return res.json({ message: 'Password reset successful.', require2FA: true, tempToken });
-    }
-
-    const token = generateToken({ userId: user._id.toString(), role: user.role });
-
-    res.cookie('jwt', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
-
-    res.json({
-      message: 'Password reset successful.',
-      token, 
-      user: { 
-        id: user._id, 
-        phone: user.phone, 
-        name: user.name, 
-        email: user.email,
-        username: user.username,
-        city: user.city,
-        age: user.age,
-        role: user.role,
-        isTwoFactorEnabled: user.isTwoFactorEnabled
-      }
-    });
-  } catch (error) {
-    next(error);
   }
 });
 
