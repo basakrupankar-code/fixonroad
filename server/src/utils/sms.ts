@@ -13,9 +13,18 @@ export const sendSMS = async (to: string, body: string) => {
 
   const client = twilio(accountSid, authToken);
 
-  await client.messages.create({
-    body,
-    from: fromPhone,
-    to,
-  });
+  console.log(`\n--- ATTEMPTING TO SEND SMS TO: ${to} ---\n${body}\n----------------------------------\n`);
+
+  try {
+    await client.messages.create({
+      body,
+      from: fromPhone,
+      to,
+    });
+  } catch (error: any) {
+    console.error('\n[TWILIO ERROR]: Failed to send SMS. This is usually because Trial Accounts cannot send custom messages to India without predefined templates.');
+    console.error(`Error details: ${error.message}\n`);
+    console.log(`Please use the OTP printed above to continue testing!`);
+    // We don't throw the error so the app flow can continue for testing purposes.
+  }
 };

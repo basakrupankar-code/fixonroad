@@ -1,0 +1,1 @@
+const mongoose = require('mongoose'); mongoose.connect('mongodb://127.0.0.1:27017/fixonroad').then(async () => { const db = mongoose.connection.db; await db.collection('users').updateOne({ email: 'basakrupankar@gmail.com' }, { $set: { phone: '+917478729385' } }); console.log('Fixed'); process.exit(0); })

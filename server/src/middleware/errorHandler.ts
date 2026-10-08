@@ -10,10 +10,11 @@ export const errorHandler = (
   console.error(err);
 
   if (err instanceof ZodError) {
+    const errorMessage = err.issues[0]?.message || 'Invalid request data';
     return res.status(400).json({
       error: {
         code: 'VALIDATION_ERROR',
-        message: 'Invalid request data',
+        message: errorMessage,
         details: err.issues,
       },
     });

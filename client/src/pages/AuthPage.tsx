@@ -1,16 +1,20 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Wrench, Phone, ArrowRight, ChevronLeft, CarFront, Mail, User as UserIcon, MapPin, Calendar } from 'lucide-react';
+import { Wrench, Phone, ArrowRight, ChevronLeft, CarFront, Mail, User as UserIcon, MapPin, Calendar, Eye, EyeOff, Wand2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { signInWithPopup } from 'firebase/auth';
 import { auth as firebaseAuth, googleProvider } from '../lib/firebase';
+import { PasswordPolicy } from '../components/PasswordPolicy';
+import toast from 'react-hot-toast';
 
 type Role = 'customer' | 'mechanic';
 type Step = 'phone' | 'otp';
-type Mode = 'login' | 'register';
+type Mode = 'login' | 'register' | '2fa' | 'forgot_password';
 
 export default function AuthPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const initialRole = searchParams.get('role') === 'mechanic' ? 'mechanic' : 'customer';
   
@@ -18,6 +22,7 @@ export default function AuthPage() {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   const [registerData, setRegisterData] = useState({
     name: '',
@@ -31,10 +36,14 @@ export default function AuthPage() {
   });
   
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [registerSuccess, setRegisterSuccess] = useState(false);
-  
+  const [forgotIdentifier, setForgotIdentifier] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotStep, setForgotStep] = useState<'request' | 'verify' | 'reset'>('request');
+  const [resetToken, setResetToken] = useState('');
+  const [tempToken, setTempToken] = useState('');
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -51,18 +60,16 @@ export default function AuthPage() {
     }
     const verified = searchParams.get('verified');
     if (verified === 'true') {
-      setSuccessMsg('Email verified successfully! You can now log in.');
+      toast.success('Email verified successfully! You can now log in.');
       setMode('login');
     }
   }, [searchParams]);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccessMsg(null);
 
     if (!email || !password) {
-      setError('Please enter email and password');
+      toast.error('Please enter email and password');
       return;
     }
 
@@ -77,10 +84,44 @@ export default function AuthPage() {
       
       if (!res.ok) throw new Error(data.error?.message || 'Login failed');
       
+      if (data.require2FA) {
+        setTempToken(data.tempToken);
+        setMode('2fa');
+        return;
+      }
+      
       login(data.user);
       navigate(data.user.role === 'mechanic' ? '/mechanic' : '/services');
     } catch (err: any) {
-      setError(err.message);
+      toast.error(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handle2FALogin = async (e: FormEvent) => {
+    e.preventDefault();
+
+    if (twoFactorCode.length !== 6) {
+      toast.error('Please enter a valid 6-digit code');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/v1/auth/login/2fa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tempToken, code: twoFactorCode })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error?.message || '2FA verification failed');
+      
+      login(data.user);
+      navigate(data.user.role === 'mechanic' ? '/mechanic' : '/services');
+    } catch (err: any) {
+      toast.error(err.message);
     } finally {
       setIsLoading(false);
     }
@@ -88,11 +129,9 @@ export default function AuthPage() {
 
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccessMsg(null);
 
     if (!registerData.acceptedCookies) {
-      setError('You must accept cookies to register');
+      toast.error('You must accept cookies to register');
       return;
     }
 
@@ -116,9 +155,9 @@ export default function AuthPage() {
       if (!res.ok) throw new Error(data.error?.message || data.message || 'Registration failed');
       
       setRegisterSuccess(true);
-      setSuccessMsg(data.message);
+      toast.success(data.message);
     } catch (err: any) {
-      setError(err.message);
+      toast.error(err.message);
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +165,7 @@ export default function AuthPage() {
 
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser');
+      toast.error('Geolocation is not supported by your browser');
       return;
     }
     
@@ -140,29 +179,51 @@ export default function AuthPage() {
           const city = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district;
           if (city) {
             setRegisterData(prev => ({ ...prev, city }));
-            setError(null);
+            toast.success('Location detected!');
           } else {
-            setError('Could not detect city automatically');
+            toast.error('Could not detect city automatically');
           }
         } catch (err) {
-          setError('Failed to fetch location data');
+          toast.error('Failed to fetch location data');
         } finally {
           setIsLoading(false);
         }
       },
       (err) => {
-        setError('Failed to get location permission');
+        toast.error('Failed to get location permission');
         setIsLoading(false);
       }
     );
   };
 
-  const handleGoogleLogin = async () => {
-    setError(null);
+  const handleGeneratePassword = () => {
+    const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const lower = "abcdefghijklmnopqrstuvwxyz";
+    const numbers = "0123456789";
+    const special = "!@#$%^&*()_+~`|}{[]:;?><,./-=";
+    const all = upper + lower + numbers + special;
 
+    let pwd = "";
+    pwd += upper[Math.floor(Math.random() * upper.length)];
+    pwd += lower[Math.floor(Math.random() * lower.length)];
+    pwd += numbers[Math.floor(Math.random() * numbers.length)];
+    pwd += special[Math.floor(Math.random() * special.length)];
+
+    for (let i = 0; i < 10; i++) {
+      pwd += all[Math.floor(Math.random() * all.length)];
+    }
+
+    pwd = pwd.split('').sort(() => 0.5 - Math.random()).join('');
+    
+    setRegisterData(d => ({...d, password: pwd}));
+    setShowPassword(true);
+    toast.success('Strong password generated!');
+  };
+
+  const handleGoogleLogin = async () => {
     // Check if firebase was initialized properly
     if (!firebaseAuth || Object.keys(firebaseAuth).length === 0 || !firebaseAuth.name) {
-      setError('Firebase is not configured! Please add your VITE_FIREBASE_* credentials to the client/.env file.');
+      toast.error('Firebase is not configured! Please add your VITE_FIREBASE_* credentials to the client/.env file.');
       return;
     }
 
@@ -180,14 +241,143 @@ export default function AuthPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message || 'Google login failed');
       
+      if (data.require2FA) {
+        setTempToken(data.tempToken);
+        setMode('2fa');
+        return;
+      }
+      
       login(data.user);
       navigate(data.user.role === 'mechanic' ? '/mechanic' : '/services');
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Google sign in failed. Is your Firebase .env configured?');
+      toast.error(err.message || 'Google sign in failed. Is your Firebase .env configured?');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleForgotPasswordRequest = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!forgotIdentifier) {
+      toast.error('Please enter your email or phone number');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const isPhone = /^\d+$/.test(forgotIdentifier) || /^\+\d+$/.test(forgotIdentifier);
+      const formattedIdentifier = (isPhone && !forgotIdentifier.startsWith('+')) ? `+91${forgotIdentifier}` : forgotIdentifier;
+      
+      const res = await fetch('/api/v1/auth/forgot-password/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: formattedIdentifier })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error?.message || 'Failed to request OTP');
+      
+      toast.success(data.message);
+      setForgotStep('verify');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPasswordVerify = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!forgotOtp) {
+      toast.error('Please enter OTP');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const isPhone = /^\d+$/.test(forgotIdentifier) || /^\+\d+$/.test(forgotIdentifier);
+      const formattedIdentifier = (isPhone && !forgotIdentifier.startsWith('+')) ? `+91${forgotIdentifier}` : forgotIdentifier;
+
+      const res = await fetch('/api/v1/auth/forgot-password/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: formattedIdentifier, otp: forgotOtp })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error?.message || 'Failed to verify OTP');
+      
+      toast.success(data.message);
+      setResetToken(data.resetToken);
+      setForgotStep('reset');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPasswordReset = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!password) {
+      toast.error('Please enter new password');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/v1/auth/forgot-password/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resetToken, password })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error?.message || 'Failed to reset password');
+      
+      toast.success(data.message);
+      
+      if (data.require2FA) {
+        setTempToken(data.tempToken);
+        setMode('2fa');
+        return;
+      }
+      
+      login(data.user);
+      navigate(data.user.role === 'mechanic' ? '/mechanic' : '/services');
+      
+      setForgotStep('request');
+      setForgotIdentifier('');
+      setForgotOtp('');
+      setPassword('');
+      setResetToken('');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGenerateForgotPassword = () => {
+    const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const lower = "abcdefghijklmnopqrstuvwxyz";
+    const numbers = "0123456789";
+    const special = "!@#$%^&*()_+~`|}{[]:;?><,./-=";
+    const all = upper + lower + numbers + special;
+    let pwd = "";
+    pwd += upper[Math.floor(Math.random() * upper.length)];
+    pwd += lower[Math.floor(Math.random() * lower.length)];
+    pwd += numbers[Math.floor(Math.random() * numbers.length)];
+    pwd += special[Math.floor(Math.random() * special.length)];
+    for (let i = 0; i < 10; i++) {
+      pwd += all[Math.floor(Math.random() * all.length)];
+    }
+    pwd = pwd.split('').sort(() => 0.5 - Math.random()).join('');
+    
+    setPassword(pwd);
+    setShowPassword(true);
+    toast.success('Strong password generated!');
   };
 
   const slideVariants = {
@@ -221,7 +411,7 @@ export default function AuthPage() {
               <button
                 key={r}
                 type="button"
-                onClick={() => { setRole(r); setError(null); }}
+                onClick={() => { setRole(r); }}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${
                   role === r
                     ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
@@ -236,21 +426,21 @@ export default function AuthPage() {
         )}
 
         {/* Mode Selector */}
-        {!registerSuccess && (
+        {!registerSuccess && mode !== '2fa' && mode !== 'forgot_password' && (
           <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 mb-6">
             <button
               type="button"
-              onClick={() => { setMode('login'); setError(null); }}
+              onClick={() => { setMode('login'); }}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'login' ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
             >
-              Login
+              {t('auth.login_button')}
             </button>
             <button
               type="button"
-              onClick={() => { setMode('register'); setError(null); }}
+              onClick={() => { setMode('register'); }}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'register' ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
             >
-              Register
+              {t('auth.register_button')}
             </button>
           </div>
         )}
@@ -271,40 +461,25 @@ export default function AuthPage() {
               {registerSuccess 
                 ? 'Check Your Email' 
                 : mode === 'register' 
-                  ? 'Create an Account' 
-                  : 'Welcome Back'}
+                  ? t('auth.create_account') 
+                  : mode === '2fa'
+                    ? 'Two-Factor Authentication'
+                    : mode === 'forgot_password'
+                      ? 'Reset Password'
+                      : t('auth.welcome_back')}
             </h2>
             <p className="text-sm text-gray-400 mb-6">
               {registerSuccess 
                 ? 'A verification link has been sent to your email.'
                 : mode === 'register' 
                   ? 'Fill in your details to get started.' 
-                  : 'Enter your email and password to login.'}
+                  : mode === '2fa'
+                    ? 'Enter the 6-digit code from your authenticator app.'
+                    : mode === 'forgot_password'
+                      ? (forgotStep === 'request' ? 'Enter your email or phone number to receive an OTP.' : forgotStep === 'verify' ? 'Enter the OTP sent to your device.' : 'Set your new password.')
+                      : t('auth.login_to_account')}
             </p>
 
-            {/* Error & Success Banners */}
-            <AnimatePresence>
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-5 p-3 rounded-xl text-sm text-red-400 bg-red-500/10 border border-red-500/20"
-                >
-                  {error}
-                </motion.div>
-              )}
-              {successMsg && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-5 p-3 rounded-xl text-sm text-green-400 bg-green-500/10 border border-green-500/20"
-                >
-                  {successMsg}
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             {/* Forms */}
             <AnimatePresence mode="wait">
@@ -384,18 +559,28 @@ export default function AuthPage() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-medium block mb-1 text-gray-400">Password</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-gray-400">Password</label>
+                        <button type="button" onClick={handleGeneratePassword} className="text-xs text-orange-400 hover:text-orange-300 flex items-center gap-1 transition-colors">
+                          <Wand2 className="w-3 h-3" /> Auto-Generate
+                        </button>
+                      </div>
                       <div className="relative">
                         <input
-                          type="password"
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="new-password"
                           value={registerData.password}
                           onChange={e => setRegisterData(d => ({...d, password: e.target.value}))}
-                          className="w-full h-10 bg-white/5 border border-white/10 rounded-xl px-3 text-sm text-white focus:border-orange-500/50 outline-none"
+                          className="w-full h-10 bg-white/5 border border-white/10 rounded-xl pl-3 pr-10 text-sm text-white focus:border-orange-500/50 outline-none"
                           placeholder="••••••"
                           required
-                          minLength={6}
+                          minLength={12}
                         />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors">
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
                       </div>
+                      <PasswordPolicy password={registerData.password} email={registerData.email} />
                     </div>
                   </div>
 
@@ -484,6 +669,167 @@ export default function AuthPage() {
                     </span>
                   </button>
                 </motion.form>
+              ) : mode === '2fa' ? (
+                <motion.form
+                  key="2fa-form"
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.3 }}
+                  onSubmit={handle2FALogin}
+                  className="space-y-5"
+                >
+                  <div>
+                    <label htmlFor="auth-2fa" className="text-xs font-medium block mb-1.5 text-gray-400">Authenticator Code</label>
+                    <div className="relative">
+                      <input
+                        id="auth-2fa"
+                        type="text"
+                        maxLength={6}
+                        value={twoFactorCode}
+                        onChange={e => setTwoFactorCode(e.target.value.replace(/\D/g, ''))}
+                        className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-4 text-white text-center tracking-widest focus:outline-none focus:border-orange-500/50 transition-colors"
+                        placeholder="123456"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading || twoFactorCode.length !== 6}
+                    className="w-full h-11 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="relative z-10 flex items-center gap-2">
+                      {isLoading ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>Verify <ArrowRight className="w-4 h-4" /></>
+                      )}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setMode('login'); setTwoFactorCode(''); setTempToken(''); }}
+                    className="w-full text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Back to Login
+                  </button>
+                </motion.form>
+              ) : mode === 'forgot_password' ? (
+                <motion.div
+                  key="forgot-password"
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.3 }}
+                >
+                  {forgotStep === 'request' ? (
+                    <form onSubmit={handleForgotPasswordRequest} className="space-y-5">
+                      <div>
+                        <label className="text-xs font-medium block mb-1.5 text-gray-400">Email or Phone Number</label>
+                        <div className="relative">
+                          <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <input
+                            type="text"
+                            value={forgotIdentifier}
+                            onChange={e => setForgotIdentifier(e.target.value)}
+                            className="w-full h-11 bg-white/5 border border-white/10 rounded-xl pl-11 pr-4 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                            placeholder="john@example.com or 9876543210"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={isLoading || !forgotIdentifier}
+                        className="w-full h-11 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Send OTP'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setMode('login'); setForgotStep('request'); }}
+                        className="w-full text-sm text-gray-400 hover:text-white transition-colors mt-4 block text-center"
+                      >
+                        Back to Login
+                      </button>
+                    </form>
+                  ) : forgotStep === 'verify' ? (
+                    <form onSubmit={handleForgotPasswordVerify} className="space-y-5">
+                      <div>
+                        <label className="text-xs font-medium block mb-1.5 text-gray-400">OTP Code</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            maxLength={6}
+                            value={forgotOtp}
+                            onChange={e => setForgotOtp(e.target.value.replace(/\D/g, ''))}
+                            className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-4 text-white text-center tracking-widest focus:outline-none focus:border-orange-500/50 transition-colors"
+                            placeholder="123456"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={isLoading || forgotOtp.length !== 6}
+                        className="w-full h-11 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Verify OTP'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setForgotStep('request'); setForgotOtp(''); }}
+                        className="w-full text-sm text-gray-400 hover:text-white transition-colors mt-4 block text-center"
+                      >
+                        Back
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleForgotPasswordReset} className="space-y-5">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-medium text-gray-400">New Password</label>
+                          <button type="button" onClick={handleGenerateForgotPassword} className="text-xs text-orange-400 hover:text-orange-300 flex items-center gap-1 transition-colors">
+                            <Wand2 className="w-3 h-3" /> Auto-Generate
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            className="w-full h-11 bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                            placeholder="••••••"
+                            required
+                            minLength={12}
+                          />
+                          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors">
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        <PasswordPolicy password={password} email="" />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={isLoading || !password}
+                        className="w-full h-11 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Reset Password & Login'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setMode('login'); setForgotStep('request'); setForgotOtp(''); }}
+                        className="w-full text-sm text-gray-400 hover:text-white transition-colors mt-4 block text-center"
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  )}
+                </motion.div>
               ) : (
                 <motion.form
                   key="login-form"
@@ -512,17 +858,26 @@ export default function AuthPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="auth-password" className="text-xs font-medium block mb-1.5 text-gray-400">Password</label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label htmlFor="auth-password" className="text-xs font-medium text-gray-400">Password</label>
+                      <button type="button" onClick={() => { setMode('forgot_password'); setForgotStep('request'); setForgotIdentifier(''); setPassword(''); setShowPassword(false); }} className="text-xs text-orange-400 hover:text-orange-300 transition-colors">
+                        Forgot Password?
+                      </button>
+                    </div>
                     <div className="relative">
                       <input
                         id="auth-password"
-                        type="password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-4 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                        className="w-full h-11 bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
                         placeholder="••••••"
                         required
                       />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors">
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
 
@@ -544,7 +899,7 @@ export default function AuthPage() {
             </AnimatePresence>
             
             {/* Divider */}
-            {!registerSuccess && (
+            {!registerSuccess && mode !== '2fa' && mode !== 'forgot_password' && (
               <div className="flex items-center my-6">
                 <div className="flex-1 border-t border-white/10"></div>
                 <span className="px-3 text-xs text-gray-500 uppercase">or</span>
@@ -553,7 +908,7 @@ export default function AuthPage() {
             )}
 
             {/* Google Login Button */}
-            {!registerSuccess && (
+            {!registerSuccess && mode !== '2fa' && mode !== 'forgot_password' && (
               <button
                 type="button"
                 onClick={handleGoogleLogin}

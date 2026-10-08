@@ -10,7 +10,8 @@ const mechanicSchema = new mongoose.Schema({
   },
   locationUpdatedAt: { type: Date },
   ratingAvg: { type: Number, default: 0 },
-  ratingCount: { type: Number, default: 0 }
+  ratingCount: { type: Number, default: 0 },
+  specializations: { type: [String], default: [] }
 }, { timestamps: true });
 
 mechanicSchema.index({ location: '2dsphere' });

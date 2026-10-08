@@ -1,0 +1,194 @@
+{
+  "auth": {
+    "welcome_back": "Welcome Back",
+    "login_to_account": "Login to your account",
+    "create_account": "Create Account",
+    "join_us": "Join Us",
+    "phone_number": "Phone Number",
+    "password": "Password",
+    "login_button": "Login",
+    "register_button": "Register"
+  },
+  "profile": {
+    "my_profile": "My Profile",
+    "edit_profile": "Edit Profile",
+    "cancel": "Cancel",
+    "save_changes": "Save Changes",
+    "language_preference": "Language Preference",
+    "english": "English",
+    "bengali": "Bengali",
+    "hindi": "Hindi",
+    "logout": "Logout"
+  },
+  "nav": {
+    "switchToRider": "Switch to Rider/Driver View",
+    "benefits": "Benefits",
+    "howItWorks": "How it Works",
+    "services": "Services",
+    "forMechanics": "For Mechanics",
+    "mechanicsLabel": "Mechanics",
+    "logout": "Logout",
+    "partnerLogin": "Partner Login",
+    "signIn": "Sign In",
+    "home": "Home"
+  },
+  "footer": {
+    "description": "On-demand roadside assistance for two-wheelers and four-wheelers. Fixed prices, live tracking, and verified mechanics in Kalyani, West Bengal.",
+    "quickLinks": "Quick Links",
+    "contact": "Contact",
+    "addressLine1": "Kalyani, Nadia",
+    "addressLine2": "West Bengal, India",
+    "copyright": "© 2026 FixOnRoad. Made with ❤️ in West Bengal.",
+    "switchToRider": "← Switch to Rider View",
+    "switchToMechanic": "Switch to Mechanic Portal →"
+  },
+  "howItWorks": {
+    "badge": "How It Works",
+    "heading1": "Roadside Help in",
+    "heading2": "4 Simple Steps",
+    "step1": {
+      "title": "Pin Your Location",
+      "desc": "Instant auto-detection or manual landmark selection in Kalyani / West Bengal."
+    },
+    "step2": {
+      "title": "Select Issue & Get Price",
+      "desc": "Choose flat tire, jump start, chain, or towing. Transparent upfront pricing with no hidden charges."
+    },
+    "step3": {
+      "title": "Mechanic Dispatched",
+      "desc": "Live GPS tracking as your verified technician arrives in minutes with the right tools."
+    },
+    "step4": {
+      "title": "Pay Digitally or Cash",
+      "desc": "Inspect the fix and pay seamlessly via UPI (GPay/PhonePe/Paytm) or cash."
+    }
+  },
+  "hero": {
+    "marquee": {
+      "Flat_Tire_Repair": "Flat Tire Repair",
+      "Jump_Start": "Jump Start",
+      "Chain_Fix": "Chain Fix",
+      "Engine_Diagnosis": "Engine Diagnosis",
+      "Brake_Repair": "Brake Repair",
+      "Fuel_Delivery": "Fuel Delivery",
+      "500+_Mechanics": "500+ Mechanics",
+      "Fixed_Pricing": "Fixed Pricing",
+      "Live_Tracking": "Live Tracking",
+      "15_Min_Response": "15 Min Response"
+    },
+    "liveTracker": {
+      "title": "Live Dispatch Radar",
+      "live": "Live",
+      "searching": "Finding nearest mechanic…",
+      "mechanicFound": "Sanjay Das (Bike Expert)",
+      "scanning": "Scanning 3 km radius",
+      "eta": "{{distance}} km away · {{eta}} min ETA",
+      "statusSearching": "Searching",
+      "statusMatched": "Matched",
+      "statusEnRoute": "En Route"
+    },
+    "intro": {
+      "subtitle": "Two-Wheeler Assistance · Reimagined"
+    },
+    "titleTag": "FixOnRoad — On-Demand Roadside Help for Bikes & Cars",
+    "liveIn": "Live in Kalyani, West Bengal",
+    "heading1": "On-Demand",
+    "heading2": "Roadside Help",
+    "heading3": "for Bikes & Cars.",
+    "subheading": "Stranded on your vehicle? Request a verified mechanic instantly. Fixed pricing, live tracking, and fast response times.",
+    "useCurrentLocation": "Use Current Location",
+    "locating": "Locating...",
+    "kalyaniHighway": "Kalyani Highway",
+    "requestHelp": "Request Help",
+    "avgResponse": "Avg Response",
+    "verifiedMechanics": "Verified Mechanics",
+    "userRating": "User Rating",
+    "issues": {
+      "flatTire": "Flat Tire",
+      "deadBattery": "Dead Battery",
+      "chainSnapped": "Chain Snapped",
+      "wontStart": "Won't Start"
+    },
+    "triage": {
+      "badge": "Instant Assistance",
+      "heading1": "What happened to",
+      "heading2": "your vehicle?",
+      "subheading": "Select your issue for transparent, fixed pricing and instant mechanic dispatch."
+    },
+    "pillars": {
+      "pricing": {
+        "title": "Fixed Transparent Pricing",
+        "desc": "Starting at ₹150. Know the exact cost before confirming the request. No haggling on the roadside."
+      },
+      "gps": {
+        "title": "Real-time GPS Tracking",
+        "desc": "Watch your assigned mechanic travel to your exact location on a live map with precise ETAs."
+      },
+      "payment": {
+        "title": "Instant UPI / Cash",
+        "desc": "Pay seamlessly through the app via UPI, card, or hand cash directly to the mechanic after the job is done."
+      }
+    },
+    "mechanics": {
+      "badge": "Verified Experts",
+      "heading1": "500+ Certified",
+      "heading2": "Mechanics",
+      "heading3": "On Call.",
+      "desc": "Every mechanic on FixOnRoad is background-verified, rated by real riders, and equipped to handle bike emergencies on the spot."
+    }
+  },
+  "mechanicLanding": {
+    "titleTag": "Partner With FixOnRoad — Earn on Your Schedule in West Bengal",
+    "onboarding": "Now Onboarding in West Bengal",
+    "heading1": "Your Skills,",
+    "heading2": "Their Need,",
+    "heading3": "Your Profit.",
+    "subheading": "Customers find you. Prices are pre-agreed. You show up, fix, and get paid instantly. Zero commission for the first 6 months.",
+    "startEarning": "Start Earning Today",
+    "seeHowItWorks": "See How It Works",
+    "stats": {
+      "mechanicsJoined": "Mechanics Joined",
+      "satisfactionRate": "Satisfaction Rate",
+      "avgResponse": "Avg. Response"
+    },
+    "appPreview": {
+      "todaysEarnings": "Today's Earnings",
+      "jobsCompleted": "jobs completed",
+      "newJob": "⚡ New Job",
+      "accept": "Accept",
+      "decline": "Decline"
+    },
+    "benefits": {
+      "title1": "Why Mechanics",
+      "title2": "Love Us",
+      "subheading": "We built FixOnRoad to solve every pain-point local mechanics face daily.",
+      "item1": { "title": "No Wasted Trips", "desc": "Get accurate GPS pins. You only travel when you accept a job near you. See distance and ETA before accepting." },
+      "item2": { "title": "Fixed Pricing, No Haggling", "desc": "Customers accept the price before booking. No bargaining at the roadside. Your rate = your earnings." },
+      "item3": { "title": "Instant Secure Payouts", "desc": "Instant daily settlements directly via UPI (PhonePe, Google Pay, Paytm) or direct bank transfer. Zero hold time." },
+      "item4": { "title": "Zero Commission (Launch)", "desc": "Keep 100% of every rupee during our launch phase. No hidden fees. No platform deductions." },
+      "item5": { "title": "Build Your Reputation", "desc": "Every 5-star review builds your profile. Top mechanics get priority in job dispatch." },
+      "item6": { "title": "Grow Your Business", "desc": "Track your earnings, completion rate, and customer feedback in a simple dashboard." }
+    },
+    "steps": {
+      "title1": "Start in",
+      "title2": "3 Steps",
+      "item1": { "title": "Sign Up Free", "desc": "Register with your phone number. Choose your focus: Two-Wheeler Specialist, Car & EV Specialist, or Multi-Vehicle Technician. Upload Aadhaar/PAN for verification. Takes 2 minutes." },
+      "item2": { "title": "Go Online", "desc": "Toggle your status to \"Online\" when ready. You'll receive jobs within your radius." },
+      "item3": { "title": "Fix & Earn", "desc": "Accept a job, ride to the pin, fix the vehicle (bike or car), get paid. It's that simple." }
+    },
+    "testimonials": {
+      "title1": "What",
+      "title2": "Mechanics Say"
+    },
+    "faq": {
+      "title1": "Frequently Asked",
+      "title2": "Questions"
+    },
+    "cta": {
+      "title1": "Ready to",
+      "title2": "Earn More?",
+      "desc": "Join 500+ mechanics already earning with FixOnRoad. Registration is free and takes 2 minutes.",
+      "button": "Join as Partner — It's Free"
+    }
+  }
+}

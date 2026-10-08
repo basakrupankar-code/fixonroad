@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { Wrench, Globe, Mail, Heart } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export default function Footer({ variant = 'rider' }: { variant?: 'rider' | 'mechanic' }) {
+  const { t } = useTranslation();
   const isMechanic = variant === 'mechanic';
 
   return (
@@ -17,7 +19,7 @@ export default function Footer({ variant = 'rider' }: { variant?: 'rider' | 'mec
               </span>
             </div>
             <p className="text-[15px] leading-relaxed max-w-sm" style={{ color: 'var(--text-secondary)' }}>
-              On-demand roadside assistance for two-wheelers and four-wheelers. Fixed prices, live tracking, and verified mechanics in Kalyani, West Bengal.
+              {t('footer.description', 'On-demand roadside assistance for two-wheelers and four-wheelers. Fixed prices, live tracking, and verified mechanics in Kalyani, West Bengal.')}
             </p>
             <div className="flex gap-3 mt-5">
               <a href="#" aria-label="Twitter" className="p-2.5 rounded-xl transition-all duration-300 hover:scale-110 hover:text-[var(--text-primary)]" style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)' }}>
@@ -34,21 +36,21 @@ export default function Footer({ variant = 'rider' }: { variant?: 'rider' | 'mec
 
           {/* Quick Links */}
           <div>
-            <h4 className="font-semibold font-['Outfit'] mb-4 text-[15px]">Quick Links</h4>
+            <h4 className="font-semibold font-['Outfit'] mb-4 text-[15px]">{t('footer.quickLinks', 'Quick Links')}</h4>
             <div className="flex flex-col gap-3 text-[15px]" style={{ color: 'var(--text-secondary)' }}>
-              <Link to="/" className="hover:text-[var(--text-primary)] transition-colors">Home</Link>
-              <Link to="/services" className="hover:text-[var(--text-primary)] transition-colors">Services</Link>
-              <Link to="/mechanic" className="hover:text-[var(--text-primary)] transition-colors">For Mechanics</Link>
-              <Link to="/auth" className="hover:text-[var(--text-primary)] transition-colors">Sign In</Link>
+              <Link to="/" className="hover:text-[var(--text-primary)] transition-colors">{t('nav.home', 'Home')}</Link>
+              <Link to="/services" className="hover:text-[var(--text-primary)] transition-colors">{t('nav.services', 'Services')}</Link>
+              <Link to="/mechanic" className="hover:text-[var(--text-primary)] transition-colors">{t('nav.forMechanics', 'For Mechanics')}</Link>
+              <Link to="/auth" className="hover:text-[var(--text-primary)] transition-colors">{t('nav.signIn', 'Sign In')}</Link>
             </div>
           </div>
 
           {/* Contact */}
           <div>
-            <h4 className="font-semibold font-['Outfit'] mb-4 text-[15px]">Contact</h4>
+            <h4 className="font-semibold font-['Outfit'] mb-4 text-[15px]">{t('footer.contact', 'Contact')}</h4>
             <div className="flex flex-col gap-3 text-[15px]" style={{ color: 'var(--text-secondary)' }}>
-              <span>Kalyani, Nadia</span>
-              <span>West Bengal, India</span>
+              <span>{t('footer.addressLine1', 'Kalyani, Nadia')}</span>
+              <span>{t('footer.addressLine2', 'West Bengal, India')}</span>
               <span>support@fixonroad.in</span>
             </div>
           </div>
@@ -60,11 +62,11 @@ export default function Footer({ variant = 'rider' }: { variant?: 'rider' | 'mec
           style={{ borderTop: '1px solid var(--border-primary)', color: 'var(--text-muted)' }}
         >
           <p className="flex items-center gap-1">
-            © 2026 FixOnRoad. Made with ❤️ in West Bengal.
+            {t('footer.copyright', '© 2026 FixOnRoad. Made with ❤️ in West Bengal.')}
           </p>
           <div className="flex gap-6">
             <Link to={isMechanic ? '/' : '/mechanic'} className={`transition-colors ${isMechanic ? 'text-blue-400 hover:text-blue-300' : 'text-emerald-400 hover:text-emerald-300'}`}>
-              {isMechanic ? '← Switch to Rider View' : 'Switch to Mechanic Portal →'}
+              {isMechanic ? t('footer.switchToRider', '← Switch to Rider View') : t('footer.switchToMechanic', 'Switch to Mechanic Portal →')}
             </Link>
           </div>
         </div>

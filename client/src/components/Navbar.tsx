@@ -54,14 +54,14 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
 
   const navLinks = isMechanic
     ? [
-        { to: '/', label: 'Switch to Rider/Driver View' },
-        { to: '/mechanic#benefits', label: 'Benefits', isAnchor: true },
-        { to: '/mechanic#how-it-works', label: 'How it Works', isAnchor: true },
+        { to: '/', label: t('nav.switchToRider', 'Switch to Rider/Driver View') },
+        { to: '/mechanic#benefits', label: t('nav.benefits', 'Benefits'), isAnchor: true },
+        { to: '/mechanic#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
       ]
     : [
-        { to: '/services', label: 'Services' },
-        { to: '/mechanic', label: 'For Mechanics' },
-        { to: '/#how-it-works', label: 'How it Works', isAnchor: true },
+        { to: '/services', label: t('nav.services', 'Services') },
+        { to: '/mechanic', label: t('nav.forMechanics', 'For Mechanics') },
+        { to: '/#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
       ];
 
   return (
@@ -87,7 +87,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
             </span>
             {isMechanic && (
               <span className="ml-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20 uppercase tracking-widest">
-                Mechanics
+                {t('nav.mechanicsLabel', 'Mechanics')}
               </span>
             )}
           </Link>
@@ -138,7 +138,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   onClick={logout}
                   className="px-4 py-2 rounded-xl text-sm font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors"
                 >
-                  Logout
+                  {t('nav.logout', 'Logout')}
                 </button>
               </div>
             ) : (
@@ -148,7 +148,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   isMechanic ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/20' : 'btn-primary'
                 }`}
               >
-                <span className="relative z-10">{isMechanic ? 'Partner Login' : 'Sign In'}</span>
+                <span className="relative z-10">{isMechanic ? t('nav.partnerLogin', 'Partner Login') : t('nav.signIn', 'Sign In')}</span>
               </Link>
             )}
 
@@ -216,7 +216,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                     onClick={() => { logout(); setMobileOpen(false); }}
                     className="w-full px-5 py-2.5 rounded-xl text-sm font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors"
                   >
-                    Logout
+                    {t('nav.logout', 'Logout')}
                   </button>
                 </div>
               ) : (
@@ -224,7 +224,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   to="/auth"
                   className={`mt-4 text-center px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isMechanic ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/20' : 'btn-primary'}`}
                 >
-                  <span className="relative z-10">{isMechanic ? 'Partner Login' : 'Sign In'}</span>
+                  <span className="relative z-10">{isMechanic ? t('nav.partnerLogin', 'Partner Login') : t('nav.signIn', 'Sign In')}</span>
                 </Link>
               )}
             </motion.div>

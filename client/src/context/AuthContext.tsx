@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import i18n from '../i18n';
 
 type User = {
   id: string;
@@ -9,6 +10,8 @@ type User = {
   username?: string;
   city?: string;
   age?: number;
+  language?: string;
+  isTwoFactorEnabled?: boolean;
 };
 
 type AuthContextType = {
@@ -33,6 +36,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (response.ok) {
         const userData = await response.json();
         setUser(userData);
+        if (userData.language) {
+          i18n.changeLanguage(userData.language);
+        }
       } else {
         setUser(null);
       }
@@ -50,6 +56,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = (userData: User) => {
     setUser(userData);
+    if (userData.language) {
+      i18n.changeLanguage(userData.language);
+    }
   };
 
   const logout = async () => {
@@ -64,6 +73,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateUserData = (data: Partial<User>) => {
     if (user) {
       setUser({ ...user, ...data });
+      if (data.language) {
+        i18n.changeLanguage(data.language);
+      }
     }
   };
 
