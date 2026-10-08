@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 import { safeFetch } from '../lib/api';
 
 type Role = 'customer' | 'mechanic';
-type Mode = 'login' | 'register' | '2fa' | 'forgot_password';
+type Mode = 'login' | 'register' | '2fa' | 'forgot_password' | 'otp';
 
 export default function AuthPage() {
   const { t } = useTranslation();
@@ -43,6 +43,9 @@ export default function AuthPage() {
   const [resetToken, setResetToken] = useState('');
   const [tempToken, setTempToken] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [otpIdentifier, setOtpIdentifier] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpStep, setOtpStep] = useState<'request' | 'verify'>('request');
 
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -111,6 +114,66 @@ export default function AuthPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tempToken, code: twoFactorCode })
       });
+      
+      login(data.user);
+      navigate(data.user.role === 'mechanic' ? '/mechanic' : '/services');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOtpRequest = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!otpIdentifier) {
+      toast.error('Please enter your phone number');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const isPhone = /^\d+$/.test(otpIdentifier) || /^\+\d+$/.test(otpIdentifier);
+      const formattedIdentifier = (isPhone && !otpIdentifier.startsWith('+')) ? `+91${otpIdentifier}` : otpIdentifier;
+      
+      const data = await safeFetch('/api/v1/auth/otp/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: formattedIdentifier })
+      });
+      
+      setOtpStep('verify');
+      toast.success(data.message);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOtpVerify = async (e: FormEvent) => {
+    e.preventDefault();
+    if (otpCode.length !== 6) {
+      toast.error('Please enter a 6-digit OTP');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const isPhone = /^\d+$/.test(otpIdentifier) || /^\+\d+$/.test(otpIdentifier);
+      const formattedIdentifier = (isPhone && !otpIdentifier.startsWith('+')) ? `+91${otpIdentifier}` : otpIdentifier;
+      
+      const data = await safeFetch('/api/v1/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: formattedIdentifier, otp: otpCode })
+      });
+      
+      if (data.require2FA) {
+        setTempToken(data.tempToken);
+        setMode('2fa');
+        return;
+      }
       
       login(data.user);
       navigate(data.user.role === 'mechanic' ? '/mechanic' : '/services');
@@ -456,7 +519,9 @@ export default function AuthPage() {
                     ? 'Enter the 6-digit code from your authenticator app.'
                     : mode === 'forgot_password'
                       ? (forgotStep === 'request' ? 'Enter your email or phone number to receive an OTP.' : forgotStep === 'verify' ? 'Enter the OTP sent to your device.' : 'Set your new password.')
-                      : t('auth.login_to_account')}
+                      : mode === 'otp'
+                        ? (otpStep === 'request' ? 'Enter your phone number to login with OTP.' : 'Enter the 6-digit OTP sent to your phone.')
+                        : t('auth.login_to_account')}
             </p>
 
 
@@ -809,6 +874,81 @@ export default function AuthPage() {
                     </form>
                   )}
                 </motion.div>
+              ) : mode === 'otp' ? (
+                <motion.div
+                  key="otp-login"
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.3 }}
+                >
+                  {otpStep === 'request' ? (
+                    <form onSubmit={handleOtpRequest} className="space-y-5">
+                      <div>
+                        <label htmlFor="otp-identifier" className="text-xs font-medium block mb-1.5 text-gray-400">Phone Number</label>
+                        <div className="relative">
+                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <input
+                            id="otp-identifier"
+                            type="tel"
+                            value={otpIdentifier}
+                            onChange={e => setOtpIdentifier(e.target.value)}
+                            className="w-full h-11 bg-white/5 border border-white/10 rounded-xl pl-11 pr-4 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                            placeholder="9876543210"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full h-11 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Get OTP'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setMode('login'); setOtpIdentifier(''); }}
+                        className="w-full text-sm text-gray-400 hover:text-white transition-colors mt-4 block text-center"
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleOtpVerify} className="space-y-5">
+                      <div>
+                        <label htmlFor="otp-code" className="text-xs font-medium block mb-1.5 text-gray-400">6-Digit OTP</label>
+                        <div className="relative">
+                          <input
+                            id="otp-code"
+                            type="text"
+                            maxLength={6}
+                            value={otpCode}
+                            onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                            className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-4 text-white text-center tracking-widest focus:outline-none focus:border-orange-500/50 transition-colors"
+                            placeholder="123456"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={isLoading || otpCode.length !== 6}
+                        className="w-full h-11 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Verify & Login'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setOtpStep('request'); setOtpCode(''); }}
+                        className="w-full text-sm text-gray-400 hover:text-white transition-colors mt-4 block text-center"
+                      >
+                        Back
+                      </button>
+                    </form>
+                  )}
+                </motion.div>
               ) : (
                 <motion.form
                   key="login-form"
@@ -878,7 +1018,7 @@ export default function AuthPage() {
             </AnimatePresence>
             
             {/* Divider */}
-            {!registerSuccess && mode !== '2fa' && mode !== 'forgot_password' && (
+            {!registerSuccess && mode !== '2fa' && mode !== 'forgot_password' && mode !== 'otp' && (
               <div className="flex items-center my-6">
                 <div className="flex-1 border-t border-white/10"></div>
                 <span className="px-3 text-xs text-gray-500 uppercase">or</span>
@@ -886,11 +1026,21 @@ export default function AuthPage() {
               </div>
             )}
 
-            {/* Google Login Button */}
-            {!registerSuccess && mode !== '2fa' && mode !== 'forgot_password' && (
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
+            {/* Google & OTP Login Buttons */}
+            {!registerSuccess && mode !== '2fa' && mode !== 'forgot_password' && mode !== 'otp' && (
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => { setMode('otp'); setOtpStep('request'); setOtpIdentifier(''); setOtpCode(''); }}
+                  disabled={isLoading}
+                  className="w-full h-11 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl flex items-center justify-center gap-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-white/10"
+                >
+                  <Phone className="w-5 h-5" />
+                  Login with Phone OTP
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
                 disabled={isLoading}
                 className="w-full h-11 bg-white hover:bg-gray-100 text-gray-900 font-medium rounded-xl flex items-center justify-center gap-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -902,6 +1052,20 @@ export default function AuthPage() {
                 </svg>
                 Continue with Google
               </button>
+            </div>
+            )}
+            
+            {/* Toggle Mode */}
+            {!registerSuccess && mode !== '2fa' && mode !== 'forgot_password' && mode !== 'otp' && (
+              <div className="mt-6 text-center">
+                <button
+                  type="button"
+                  onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  {mode === 'login' ? "Don't have an account? Sign up" : "Already have an account? Log in"}
+                </button>
+              </div>
             )}
 
             {/* Disclaimer */}
