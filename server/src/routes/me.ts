@@ -167,10 +167,7 @@ router.post('/2fa/disable', async (req, res, next) => {
   }
 });
 
-router.post('/logout', (req, res, next) => {
-  res.clearCookie('jwt', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
-  res.json({ message: 'Logged out successfully' });
-});
+
 
 import { Mechanic } from '../models/Mechanic';
 
