@@ -11,7 +11,6 @@ import toast from 'react-hot-toast';
 import { safeFetch } from '../lib/api';
 
 type Role = 'customer' | 'mechanic';
-type Step = 'phone' | 'otp';
 type Mode = 'login' | 'register' | '2fa' | 'forgot_password';
 
 export default function AuthPage() {
@@ -175,13 +174,13 @@ export default function AuthPage() {
           } else {
             toast.error('Could not detect city automatically');
           }
-        } catch (err) {
+        } catch (_err) {
           toast.error('Failed to fetch location data');
         } finally {
           setIsLoading(false);
         }
       },
-      (err) => {
+      (_err) => {
         toast.error('Failed to get location permission');
         setIsLoading(false);
       }

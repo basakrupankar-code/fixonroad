@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Wrench } from 'lucide-react';
+import { safeFetch } from '../lib/api';
 
 export const Login = () => {
   const [phone, setPhone] = useState('');
@@ -22,14 +23,11 @@ export const Login = () => {
 
     try {
       const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
-      const res = await fetch('/api/v1/auth/otp/request', {
+      await safeFetch('/api/v1/auth/otp/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: formattedPhone })
+        body: JSON.stringify({ identifier: formattedPhone })
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || 'Failed to request OTP');
 
       setStep('otp');
       // In dev mode, OTP is logged to backend console
@@ -48,14 +46,11 @@ export const Login = () => {
 
     try {
       const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
-      const res = await fetch('/api/v1/auth/otp/verify', {
+      const data = await safeFetch('/api/v1/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: formattedPhone, otp, role })
+        body: JSON.stringify({ identifier: formattedPhone, otp, role })
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || 'Invalid OTP');
 
       // Update auth context
       login(data.user);

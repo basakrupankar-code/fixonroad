@@ -284,8 +284,8 @@ router.post('/otp/request', async (req, res, next) => {
       return res.status(400).json({ error: { message: 'Email-based OTP is disabled. Please use your phone number.' } });
     }
     
-    // Generate 6-digit OTP (Twilio Trial constraint for phone numbers)
-    const otp = '482913';
+    // Generate 6-digit OTP 
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
       
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
@@ -450,11 +450,12 @@ router.post('/forgot-password/request', async (req, res, next) => {
     }
 
     const isEmail = identifier.includes('@');
+    if (isEmail) {
+      return res.status(400).json({ error: { message: 'Email-based OTP is disabled. Please use your phone number.' } });
+    }
     
-    // Generate 6-digit OTP (Twilio Trial constraint for phone numbers)
-    const otp = isEmail 
-      ? Math.floor(100000 + Math.random() * 900000).toString()
-      : '482913';
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
       
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
 

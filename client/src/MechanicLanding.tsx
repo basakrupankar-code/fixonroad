@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Settings, ShieldCheck, MapPin, Banknote, ArrowRight, Star, Users, TrendingUp, ChevronDown, Phone, Clock, Zap, Bike, CarFront, ChevronUp, Plus, Minus } from 'lucide-react';
+import { Settings, ShieldCheck, MapPin, Banknote, ArrowRight, Star, Users, TrendingUp, ChevronDown, Phone, Clock, Zap, Bike, CarFront, Plus, Minus } from 'lucide-react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 

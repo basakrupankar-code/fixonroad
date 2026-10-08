@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User as UserIcon, Mail, Phone, MapPin, Hash, Activity, Save, AlertCircle, CheckCircle2, Key, Shield, Eye, EyeOff, Wand2 } from 'lucide-react';
+import { User as UserIcon, Mail, Phone, MapPin, Hash, Activity, Save, Key, Shield, Eye, EyeOff, Wand2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';

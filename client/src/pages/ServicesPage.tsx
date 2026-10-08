@@ -176,7 +176,6 @@ function EmptyState({ query }: { query: string }) {
 export default function ServicesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'bike' | 'car'>('all');
-  const [selectedService, setSelectedService] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
