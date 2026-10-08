@@ -297,7 +297,7 @@ router.post('/otp/request', async (req, res, next) => {
     if (isEmail) {
       await sendEmail(identifier, 'FixOnRoad Verification Code', `Your FixOnRoad verification code is ${otp}. It expires in 5 minutes.`);
     } else {
-      await sendSMS(identifier, 'sms_2fa');
+      await sendSMS(identifier, `Your FixOnRoad verification code is ${otp}. It expires in 5 minutes.`);
     }
 
     res.json({ message: 'OTP sent', expiresInSeconds: 300 });
@@ -468,7 +468,7 @@ router.post('/forgot-password/request', async (req, res, next) => {
     if (isEmail) {
       await sendEmail(identifier, 'FixOnRoad Password Reset', `Your FixOnRoad password reset code is ${otp}. It expires in 5 minutes.`);
     } else {
-      await sendSMS(identifier, 'sms_2fa');
+      await sendSMS(identifier, `Your FixOnRoad verification code is ${otp}. It expires in 5 minutes.`);
     }
 
     res.json({ message: 'Password reset OTP sent', expiresInSeconds: 300 });
