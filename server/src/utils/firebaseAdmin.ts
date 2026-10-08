@@ -4,11 +4,19 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 if (!getApps().length) {
-  // We can initialize without credentials if we just want to verify ID tokens, 
-  // but it's best to use default creds or project ID.
-  // For verifyIdToken, just having a projectId is often enough.
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY
+    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+    : undefined;
+
   initializeApp({
-    projectId: process.env.FIREBASE_PROJECT_ID || 'fixonroad-dev'
+    projectId: process.env.FIREBASE_PROJECT_ID || 'fixonroad-dev',
+    ...(process.env.FIREBASE_CLIENT_EMAIL && privateKey && {
+      credential: require('firebase-admin/app').cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: privateKey
+      })
+    })
   });
 }
 

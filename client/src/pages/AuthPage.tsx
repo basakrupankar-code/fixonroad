@@ -8,6 +8,7 @@ import { signInWithPopup } from 'firebase/auth';
 import { auth as firebaseAuth, googleProvider } from '../lib/firebase';
 import { PasswordPolicy } from '../components/PasswordPolicy';
 import toast from 'react-hot-toast';
+import { safeFetch } from '../lib/api';
 
 type Role = 'customer' | 'mechanic';
 type Step = 'phone' | 'otp';
@@ -75,14 +76,11 @@ export default function AuthPage() {
 
     setIsLoading(true);
     try {
-      const res = await fetch('/api/v1/auth/login', {
+      const data = await safeFetch('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error?.message || 'Login failed');
       
       if (data.require2FA) {
         setTempToken(data.tempToken);
@@ -109,14 +107,11 @@ export default function AuthPage() {
 
     setIsLoading(true);
     try {
-      const res = await fetch('/api/v1/auth/login/2fa', {
+      const data = await safeFetch('/api/v1/auth/login/2fa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tempToken, code: twoFactorCode })
       });
-      const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error?.message || '2FA verification failed');
       
       login(data.user);
       navigate(data.user.role === 'mechanic' ? '/mechanic' : '/services');
@@ -145,14 +140,11 @@ export default function AuthPage() {
         role
       };
       
-      const res = await fetch('/api/v1/auth/register', {
+      const data = await safeFetch('/api/v1/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error?.message || data.message || 'Registration failed');
       
       setRegisterSuccess(true);
       toast.success(data.message);
@@ -232,14 +224,11 @@ export default function AuthPage() {
       const result = await signInWithPopup(firebaseAuth, googleProvider);
       const idToken = await result.user.getIdToken();
       
-      const res = await fetch('/api/v1/auth/google-login', {
+      const data = await safeFetch('/api/v1/auth/google-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken, role })
       });
-      
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || 'Google login failed');
       
       if (data.require2FA) {
         setTempToken(data.tempToken);
@@ -269,14 +258,11 @@ export default function AuthPage() {
       const isPhone = /^\d+$/.test(forgotIdentifier) || /^\+\d+$/.test(forgotIdentifier);
       const formattedIdentifier = (isPhone && !forgotIdentifier.startsWith('+')) ? `+91${forgotIdentifier}` : forgotIdentifier;
       
-      const res = await fetch('/api/v1/auth/forgot-password/request', {
+      const data = await safeFetch('/api/v1/auth/forgot-password/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier: formattedIdentifier })
       });
-      const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error?.message || 'Failed to request OTP');
       
       toast.success(data.message);
       setForgotStep('verify');
@@ -299,14 +285,11 @@ export default function AuthPage() {
       const isPhone = /^\d+$/.test(forgotIdentifier) || /^\+\d+$/.test(forgotIdentifier);
       const formattedIdentifier = (isPhone && !forgotIdentifier.startsWith('+')) ? `+91${forgotIdentifier}` : forgotIdentifier;
 
-      const res = await fetch('/api/v1/auth/forgot-password/verify', {
+      const data = await safeFetch('/api/v1/auth/forgot-password/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier: formattedIdentifier, otp: forgotOtp })
       });
-      const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error?.message || 'Failed to verify OTP');
       
       toast.success(data.message);
       setResetToken(data.resetToken);
@@ -327,14 +310,11 @@ export default function AuthPage() {
 
     setIsLoading(true);
     try {
-      const res = await fetch('/api/v1/auth/forgot-password/reset', {
+      const data = await safeFetch('/api/v1/auth/forgot-password/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resetToken, password })
       });
-      const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error?.message || 'Failed to reset password');
       
       toast.success(data.message);
       

@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { CreditCard, Smartphone, Banknote, CheckCircle, ChevronLeft, Shield, Copy, Check } from 'lucide-react';
+import { CreditCard, Smartphone, Banknote, CheckCircle, ChevronLeft, Shield, Copy, Check, MapPin } from 'lucide-react';
 import Navbar from '../components/Navbar';
+import { safeFetch } from '../lib/api';
 
-type PaymentMethod = 'upi' | 'card' | 'cod';
+type PaymentMethod = 'upi' | 'cod';
 
 interface ServiceData {
   id: string;
@@ -14,13 +15,12 @@ interface ServiceData {
 }
 
 export default function PaymentPage() {
-  const location = useLocation();
+  const locationState = useLocation();
   const navigate = useNavigate();
-  const service: ServiceData = location.state?.service || { id: 'flat-tire', name: 'Flat Tire / Puncture Repair', price: 150, gst: 27 };
+  const service: ServiceData = locationState.state?.service || { id: 'flat-tire', name: 'Flat Tire / Puncture Repair', price: 150, gst: 27 };
 
   const [method, setMethod] = useState<PaymentMethod>('upi');
-  const [upiId, setUpiId] = useState('');
-  const [cardData, setCardData] = useState({ number: '', expiry: '', cvv: '', name: '' });
+  const [locationText, setLocationText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentDone, setPaymentDone] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -36,26 +36,36 @@ export default function PaymentPage() {
     e.preventDefault();
     setError(null);
 
-    // Validation
-    if (method === 'upi' && !upiId.includes('@')) {
-      setError('Please enter a valid UPI ID (e.g., name@upi)');
+    if (!locationText.trim()) {
+      setError('Please provide your service location so the mechanic can find you.');
       return;
-    }
-    if (method === 'card') {
-      if (cardData.number.replace(/\s/g, '').length < 16) {
-        setError('Please enter a valid 16-digit card number');
-        return;
-      }
-      if (cardData.cvv.length < 3) {
-        setError('Please enter a valid CVV');
-        return;
-      }
     }
 
     setIsProcessing(true);
-    await new Promise(r => setTimeout(r, 2500));
-    setIsProcessing(false);
-    setPaymentDone(true);
+    
+    if (method === 'cod' || method === 'upi') {
+        try {
+          if (method === 'upi') {
+            // Direct UPI Intent to basak2@ptyes
+            const upiUrl = `upi://pay?pa=basak2@ptyes&pn=FixOnRoad&am=${total}&cu=INR`;
+            window.location.href = upiUrl;
+            
+            // Wait a bit to let the app open before showing success
+            await new Promise(resolve => setTimeout(resolve, 1500));
+          }
+
+          await safeFetch(`${import.meta.env.VITE_API_URL}/api/payments/cash-confirm`, {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+             body: JSON.stringify({ amount: total, location: locationText, method })
+          });
+          setPaymentDone(true);
+        } catch (err: any) {
+          setError(err.message || 'Failed to confirm order');
+        } finally {
+          setIsProcessing(false);
+        }
+    }
   };
 
   const copyOrderId = () => {
@@ -144,13 +154,32 @@ export default function PaymentPage() {
         <div className="grid md:grid-cols-5 gap-8">
           {/* Payment Methods — left */}
           <div className="md:col-span-3">
-            <h1 className="text-3xl font-bold font-['Outfit'] mb-6">Payment</h1>
+            <h1 className="text-3xl font-bold font-['Outfit'] mb-6">Payment & Location</h1>
+
+            {/* Service Location */}
+            <div className="glass-panel rounded-2xl p-6 mb-7 space-y-4">
+              <h3 className="font-semibold text-[17px] flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-orange-500" /> Service Location
+              </h3>
+              <div>
+                <label htmlFor="service-location" className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Where do you need the mechanic?
+                </label>
+                <textarea
+                  id="service-location"
+                  value={locationText}
+                  onChange={e => setLocationText(e.target.value)}
+                  placeholder="e.g., Near Kalyani University Main Gate, beside the ATM..."
+                  className="input-field min-h-[80px] resize-none"
+                  required
+                />
+              </div>
+            </div>
 
             {/* Method Selector */}
             <div className="flex gap-3 mb-7">
               {([
                 { key: 'upi' as PaymentMethod, label: 'UPI', icon: <Smartphone className="w-5 h-5" /> },
-                { key: 'card' as PaymentMethod, label: 'Card', icon: <CreditCard className="w-5 h-5" /> },
                 { key: 'cod' as PaymentMethod, label: 'Cash', icon: <Banknote className="w-5 h-5" /> }
               ]).map(m => (
                 <button
@@ -192,82 +221,18 @@ export default function PaymentPage() {
                 className="space-y-5"
               >
                 {method === 'upi' && (
-                  <div className="glass-panel rounded-2xl p-6 space-y-5">
-                    <h3 className="font-semibold text-[17px]">Pay via UPI</h3>
-                    <div>
-                      <label htmlFor="upi-id" className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>UPI ID</label>
-                      <input
-                        id="upi-id"
-                        type="text"
-                        value={upiId}
-                        onChange={e => setUpiId(e.target.value)}
-                        placeholder="yourname@upi"
-                        className="input-field"
-                        required
-                      />
+                  <div className="glass-panel rounded-2xl p-6 space-y-4">
+                    <h3 className="font-semibold text-[17px]">Direct UPI Transfer</h3>
+                    <p className="text-[15px]" style={{ color: 'var(--text-secondary)' }}>
+                      Click below to open any UPI app on your phone and pay directly to <span className="text-orange-400 font-medium">basak2@ptyes</span>.
+                    </p>
+                    <div className="flex items-center gap-2.5 rounded-xl p-3.5" style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.15)' }}>
+                      <Smartphone className="w-5 h-5 text-orange-400 shrink-0" />
+                      <p className="text-[13px] text-orange-400">0% Gateway fees. Fast and secure.</p>
                     </div>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Supports GooglePay, PhonePe, Paytm, BHIM & all UPI apps.</p>
                   </div>
                 )}
 
-                {method === 'card' && (
-                  <div className="glass-panel rounded-2xl p-6 space-y-5">
-                    <h3 className="font-semibold text-[17px]">Credit / Debit Card</h3>
-                    <div>
-                      <label htmlFor="card-number" className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Card Number</label>
-                      <input
-                        id="card-number"
-                        type="text"
-                        value={cardData.number}
-                        onChange={e => setCardData({ ...cardData, number: e.target.value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim() })}
-                        placeholder="4242 4242 4242 4242"
-                        maxLength={19}
-                        className="input-field font-mono"
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="card-expiry" className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Expiry</label>
-                        <input
-                          id="card-expiry"
-                          type="text"
-                          value={cardData.expiry}
-                          onChange={e => setCardData({ ...cardData, expiry: e.target.value })}
-                          placeholder="MM/YY"
-                          maxLength={5}
-                          className="input-field font-mono"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="card-cvv" className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>CVV</label>
-                        <input
-                          id="card-cvv"
-                          type="password"
-                          value={cardData.cvv}
-                          onChange={e => setCardData({ ...cardData, cvv: e.target.value })}
-                          placeholder="•••"
-                          maxLength={4}
-                          className="input-field font-mono"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label htmlFor="card-name" className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Name on Card</label>
-                      <input
-                        id="card-name"
-                        type="text"
-                        value={cardData.name}
-                        onChange={e => setCardData({ ...cardData, name: e.target.value })}
-                        placeholder="RUPANKAR BASAK"
-                        className="input-field uppercase"
-                        required
-                      />
-                    </div>
-                  </div>
-                )}
 
                 {method === 'cod' && (
                   <div className="glass-panel rounded-2xl p-6 space-y-4">
@@ -294,7 +259,7 @@ export default function PaymentPage() {
                         Processing...
                       </>
                     ) : (
-                      method === 'cod' ? `Confirm Booking — ₹${total}` : `Pay ₹${total}`
+                      method === 'cod' ? `Confirm Booking — ₹${total}` : method === 'upi' ? `Pay ₹${total} via UPI` : `Pay ₹${total}`
                     )}
                   </span>
                 </button>

@@ -423,7 +423,30 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <ScrollToTop />
-          <Toaster position="top-center" reverseOrder={false} />
+          <Toaster 
+            position="top-center" 
+            reverseOrder={false} 
+            toastOptions={{
+              style: {
+                background: '#1A1D24',
+                color: '#fff',
+                border: '1px solid rgba(249,115,22,0.2)',
+                backdropFilter: 'blur(10px)',
+              },
+              success: {
+                iconTheme: {
+                  primary: '#10B981',
+                  secondary: '#fff',
+                },
+              },
+              error: {
+                iconTheme: {
+                  primary: '#EF4444',
+                  secondary: '#fff',
+                },
+              },
+            }}
+          />
           <Routes>
             <Route path="/" element={<RiderLanding />} />
             <Route path="/mechanic" element={<MechanicLanding />} />

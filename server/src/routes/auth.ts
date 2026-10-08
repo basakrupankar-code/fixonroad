@@ -163,7 +163,7 @@ router.post('/login', async (req, res, next) => {
     res.cookie('jwt', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -213,7 +213,7 @@ router.post('/login/2fa', async (req, res, next) => {
     res.cookie('jwt', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -239,26 +239,28 @@ router.post('/login/2fa', async (req, res, next) => {
 // 2. Email verification endpoint
 router.get('/verify-email', async (req, res, next) => {
   try {
+    const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
     const { token } = req.query;
+    
     if (!token || typeof token !== 'string') {
-      return res.status(400).send('Invalid token');
+      return res.redirect(`${clientOrigin}/auth?error=InvalidToken`);
     }
 
     const payload = jwt.verify(token, JWT_SECRET) as { userId: string };
     const user = await User.findById(payload.userId);
 
     if (!user) {
-      return res.status(404).send('User not found');
+      return res.redirect(`${clientOrigin}/auth?error=UserNotFound`);
     }
 
     user.isEmailVerified = true;
     await user.save();
 
     // Redirect to frontend auth page with verified status
-    const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
     res.redirect(`${clientOrigin}/auth?verified=true`);
   } catch (error) {
-    res.status(400).send('Verification failed or token expired');
+    const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+    res.redirect(`${clientOrigin}/auth?error=VerificationFailed`);
   }
 });
 
@@ -278,11 +280,12 @@ router.post('/otp/request', async (req, res, next) => {
     }
 
     const isEmail = identifier.includes('@');
+    if (isEmail) {
+      return res.status(400).json({ error: { message: 'Email-based OTP is disabled. Please use your phone number.' } });
+    }
     
     // Generate 6-digit OTP (Twilio Trial constraint for phone numbers)
-    const otp = isEmail 
-      ? Math.floor(100000 + Math.random() * 900000).toString()
-      : '482913';
+    const otp = '482913';
       
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
@@ -293,14 +296,10 @@ router.post('/otp/request', async (req, res, next) => {
       { upsert: true, new: true }
     );
 
-    // Send Email or SMS
-    if (isEmail) {
-      await sendEmail(identifier, 'FixOnRoad Verification Code', `Your FixOnRoad verification code is ${otp}. It expires in 5 minutes.`);
-    } else {
-      await sendSMS(identifier, `Your FixOnRoad verification code is ${otp}. It expires in 5 minutes.`);
-    }
+    // Send SMS
+    await sendSMS(identifier, `Your FixOnRoad verification code is ${otp}. It expires in 5 minutes.`);
 
-    res.json({ message: 'OTP sent', expiresInSeconds: 300 });
+    res.json({ message: 'OTP sent via SMS', expiresInSeconds: 300 });
   } catch (error) {
     next(error);
   }
@@ -339,7 +338,7 @@ router.post('/otp/verify', async (req, res, next) => {
     res.cookie('jwt', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -416,7 +415,7 @@ router.post('/google-login', async (req, res, next) => {
     res.cookie('jwt', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 

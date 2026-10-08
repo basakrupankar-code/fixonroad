@@ -6,10 +6,23 @@ import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
+const allowedOrigins = process.env.CLIENT_ORIGIN 
+  ? process.env.CLIENT_ORIGIN.split(',').map(o => o.trim())
+  : ['http://localhost:5173'];
+
 app.use(cors({ 
-  origin: process.env.CLIENT_ORIGIN || '*',
+  origin: (origin, callback) => {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true 
 }));
+app.use('/api/v1/payments/webhook/stripe', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(cookieParser());
 
