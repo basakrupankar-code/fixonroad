@@ -6,7 +6,7 @@ import { User } from '../models/User';
 import { Otp } from '../models/Otp';
 import { Mechanic } from '../models/Mechanic';
 import { sendEmail } from '../utils/mailer';
-import { sendSMS } from '../utils/sms';
+import { sendSMS, requestTwilioVerify, checkTwilioVerify } from '../utils/sms';
 import { adminAuth } from '../utils/firebaseAdmin';
 import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
@@ -284,7 +284,13 @@ router.post('/otp/request', async (req, res, next) => {
       return res.status(400).json({ error: { message: 'Email-based OTP is disabled. Please use your phone number.' } });
     }
     
-    // Generate 6-digit OTP 
+    // Try sending with Twilio Verify first
+    const usedTwilioVerify = await requestTwilioVerify(identifier);
+    if (usedTwilioVerify) {
+      return res.json({ message: 'OTP sent via Twilio Verify', expiresInSeconds: 300 });
+    }
+
+    // Fallback: Generate 6-digit OTP locally if Twilio Verify isn't set up
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
       
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
@@ -310,14 +316,20 @@ router.post('/otp/verify', async (req, res, next) => {
   try {
     const { identifier, otp } = VerifyOtpSchema.parse(req.body);
 
-    const otpRecord = await Otp.findOne({ identifier, otp, expiresAt: { $gt: new Date() } });
+    // First try checking with Twilio Verify
+    const isTwilioVerified = await checkTwilioVerify(identifier, otp);
+    
+    if (!isTwilioVerified) {
+      // Fallback to checking local OTP collection
+      const otpRecord = await Otp.findOne({ identifier, otp, expiresAt: { $gt: new Date() } });
 
-    if (!otpRecord) {
-      return res.status(400).json({ error: { code: 'INVALID_OTP', message: 'Invalid or expired OTP' } });
+      if (!otpRecord) {
+        return res.status(400).json({ error: { code: 'INVALID_OTP', message: 'Invalid or expired OTP' } });
+      }
+
+      // Delete OTP after successful use
+      await Otp.deleteOne({ identifier });
     }
-
-    // Delete OTP after successful use
-    await Otp.deleteOne({ identifier });
 
     // Find user
     const user = await User.findOne({ $or: [{ phone: identifier }, { email: identifier }] });
@@ -454,7 +466,13 @@ router.post('/forgot-password/request', async (req, res, next) => {
       return res.status(400).json({ error: { message: 'Email-based OTP is disabled. Please use your phone number.' } });
     }
     
-    // Generate 6-digit OTP
+    // Try sending with Twilio Verify first
+    const usedTwilioVerify = await requestTwilioVerify(identifier);
+    if (usedTwilioVerify) {
+      return res.json({ message: 'Password reset OTP sent', expiresInSeconds: 300 });
+    }
+
+    // Fallback locally
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
       
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
@@ -482,17 +500,20 @@ router.post('/forgot-password/verify', async (req, res, next) => {
   try {
     const { identifier, otp } = VerifyOtpSchema.parse(req.body);
 
-    const otpRecord = await Otp.findOne({ identifier, otp, expiresAt: { $gt: new Date() } });
-    if (!otpRecord) {
-      return res.status(400).json({ error: { code: 'INVALID_OTP', message: 'Invalid or expired OTP' } });
+    const isTwilioVerified = await checkTwilioVerify(identifier, otp);
+    
+    if (!isTwilioVerified) {
+      const otpRecord = await Otp.findOne({ identifier, otp, expiresAt: { $gt: new Date() } });
+      if (!otpRecord) {
+        return res.status(400).json({ error: { code: 'INVALID_OTP', message: 'Invalid or expired OTP' } });
+      }
+      await Otp.deleteOne({ identifier });
     }
 
     const user = await User.findOne({ $or: [{ phone: identifier }, { email: identifier }] });
     if (!user) {
       return res.status(404).json({ error: { code: 'USER_NOT_FOUND', message: 'User not found' } });
     }
-
-    await Otp.deleteOne({ identifier });
 
     const resetToken = jwt.sign({ resetUserId: user._id.toString() }, JWT_SECRET, { expiresIn: '15m' });
 

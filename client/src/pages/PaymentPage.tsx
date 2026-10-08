@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { CreditCard, Smartphone, Banknote, CheckCircle, ChevronLeft, Shield, Copy, Check, MapPin } from 'lucide-react';
+import { CreditCard, Smartphone, Banknote, CheckCircle, ChevronLeft, Shield, Copy, Check, MapPin, Crosshair } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { safeFetch } from '../lib/api';
 
@@ -25,12 +25,44 @@ export default function PaymentPage() {
   const [paymentDone, setPaymentDone] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
 
-  const subtotal = service.price;
-  const gstAmount = service.gst;
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setIsLocating(true);
+    setError(null);
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          if (!response.ok) throw new Error('Failed to reverse geocode');
+          const data = await response.json();
+          setLocationText(data.display_name || `${latitude}, ${longitude}`);
+        } catch (err) {
+          setError('Failed to fetch address. Please enter it manually.');
+          setLocationText(`${position.coords.latitude}, ${position.coords.longitude}`);
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (err) => {
+        setError('Please allow location permissions to auto-fetch your address.');
+        setIsLocating(false);
+      }
+    );
+  };
+
+  const basePrice = Number(service?.price || 150);
+  const serviceGst = Math.round(basePrice * 0.18);
   const platformFee = 10;
   const platformGst = Math.round(platformFee * 0.18);
-  const total = subtotal + gstAmount + platformFee + platformGst;
+  const totalAmount = basePrice + serviceGst + platformFee + platformGst;
 
   const handlePay = async (e: FormEvent) => {
     e.preventDefault();
@@ -47,17 +79,17 @@ export default function PaymentPage() {
         try {
           if (method === 'upi') {
             // Direct UPI Intent to basak2@ptyes
-            const upiUrl = `upi://pay?pa=basak2@ptyes&pn=FixOnRoad&am=${total}&cu=INR`;
+            const upiUrl = `upi://pay?pa=basak2@ptyes&pn=FixOnRoad&am=${totalAmount}&cu=INR&tn=${encodeURIComponent(`FixOnRoad - ${service?.name || 'Service'}`)}`;
             window.location.href = upiUrl;
             
             // Wait a bit to let the app open before showing success
             await new Promise(resolve => setTimeout(resolve, 1500));
           }
 
-          await safeFetch(`${import.meta.env.VITE_API_URL}/api/payments/cash-confirm`, {
+          await safeFetch(`${import.meta.env.VITE_API_URL}/api/v1/payments/cash-confirm`, {
              method: 'POST',
              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-             body: JSON.stringify({ amount: total, location: locationText, method })
+             body: JSON.stringify({ amount: totalAmount, location: locationText, method })
           });
           setPaymentDone(true);
         } catch (err: any) {
@@ -106,7 +138,7 @@ export default function PaymentPage() {
               </div>
               <div className="flex justify-between text-[15px]">
                 <span style={{ color: 'var(--text-muted)' }}>Amount Paid</span>
-                <span className="font-bold text-emerald-400">₹{total}</span>
+                <span className="font-bold text-emerald-400">₹{totalAmount}</span>
               </div>
               <div className="flex justify-between text-[15px] items-center">
                 <span style={{ color: 'var(--text-muted)' }}>Order ID</span>
@@ -158,8 +190,17 @@ export default function PaymentPage() {
 
             {/* Service Location */}
             <div className="glass-panel rounded-2xl p-6 mb-7 space-y-4">
-              <h3 className="font-semibold text-[17px] flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-orange-500" /> Service Location
+              <h3 className="font-semibold text-[17px] flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2"><MapPin className="w-5 h-5 text-orange-500" /> Service Location</span>
+                <button 
+                  type="button"
+                  onClick={handleDetectLocation}
+                  disabled={isLocating}
+                  className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+                >
+                  {isLocating ? <span className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" /> : <Crosshair className="w-3.5 h-3.5" />}
+                  {isLocating ? 'Locating...' : 'Auto Fetch'}
+                </button>
               </h3>
               <div>
                 <label htmlFor="service-location" className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
@@ -242,7 +283,7 @@ export default function PaymentPage() {
                     </p>
                     <div className="flex items-center gap-2.5 rounded-xl p-3.5" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.15)' }}>
                       <Banknote className="w-5 h-5 text-yellow-400 shrink-0" />
-                      <p className="text-[13px] text-yellow-400">Please keep ₹{total} ready. The mechanic may not carry change.</p>
+                      <p className="text-[13px] text-yellow-400">Please keep ₹{totalAmount} ready. The mechanic may not carry change.</p>
                     </div>
                   </div>
                 )}
@@ -259,7 +300,7 @@ export default function PaymentPage() {
                         Processing...
                       </>
                     ) : (
-                      method === 'cod' ? `Confirm Booking — ₹${total}` : method === 'upi' ? `Pay ₹${total} via UPI` : `Pay ₹${total}`
+                      method === 'cod' ? `Confirm Booking — ₹${totalAmount}` : method === 'upi' ? `Pay ₹${totalAmount} via UPI` : `Pay ₹${totalAmount}`
                     )}
                   </span>
                 </button>
@@ -280,8 +321,8 @@ export default function PaymentPage() {
 
                 <div className="space-y-2.5 pt-2">
                   {[
-                    { label: 'Service Charge', value: `₹${subtotal}` },
-                    { label: 'GST @ 18%', value: `₹${gstAmount}` },
+                    { label: 'Service Charge', value: `₹${basePrice}` },
+                    { label: 'GST @ 18%', value: `₹${serviceGst}` },
                     { label: 'Platform Fee', value: `₹${platformFee}` },
                     { label: 'Platform GST @ 18%', value: `₹${platformGst}` },
                   ].map((item, i) => (
@@ -294,7 +335,7 @@ export default function PaymentPage() {
 
                 <div className="pt-3 flex justify-between font-bold text-base" style={{ borderTop: '1px solid var(--border-primary)' }}>
                   <span>Total</span>
-                  <span className="text-blue-400">₹{total}</span>
+                  <span className="text-blue-400">₹{totalAmount}</span>
                 </div>
 
                 <p className="text-xs flex items-center gap-1.5 pt-2" style={{ color: 'var(--text-muted)' }}>
