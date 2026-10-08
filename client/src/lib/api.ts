@@ -1,5 +1,6 @@
 export const safeFetch = async (url: string, options?: RequestInit) => {
-  const res = await fetch(url, options);
+  const finalOptions = { ...options, credentials: 'include' as RequestCredentials };
+  const res = await fetch(url, finalOptions);
   
   const contentType = res.headers.get('content-type');
   

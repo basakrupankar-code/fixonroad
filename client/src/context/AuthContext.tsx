@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import i18n from '../i18n';
+import { safeFetch } from '../lib/api';
 
 type User = {
   id: string;
@@ -32,15 +33,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/v1/me');
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-        if (userData.language) {
-          i18n.changeLanguage(userData.language);
-        }
-      } else {
-        setUser(null);
+      const userData = await safeFetch('/api/v1/me');
+      setUser(userData);
+      if (userData.language) {
+        i18n.changeLanguage(userData.language);
       }
     } catch (error) {
       console.error('Failed to check auth', error);
@@ -63,7 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     try {
-      await fetch('/api/v1/me/logout', { method: 'POST' });
+      await safeFetch('/api/v1/auth/logout', { method: 'POST' });
     } catch (e) {
       console.error(e);
     }
