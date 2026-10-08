@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Settings, ShieldCheck, MapPin, Banknote, ArrowRight, Star, Users, TrendingUp, ChevronDown, Phone, Clock, Zap, Bike, CarFront, Plus, Minus } from 'lucide-react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import { useTranslation } from 'react-i18next';
 
 /* ===== Animation Variants (typed) ===== */
 const stagger = {
@@ -55,6 +56,7 @@ const faqs = [
 ];
 
 export default function MechanicLanding() {
+  const { t } = useTranslation();
   const { scrollYProgress } = useScroll();
   const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.97]);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0.7]);
@@ -67,7 +69,7 @@ export default function MechanicLanding() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   useEffect(() => {
-    document.title = "Partner With FixOnRoad — Earn on Your Schedule in West Bengal";
+    document.title = t('mechanic.hero.titleTag', 'Partner With FixOnRoad — Earn on Your Schedule in West Bengal');
     counter1.start();
     counter2.start();
     counter3.start();
@@ -102,26 +104,26 @@ export default function MechanicLanding() {
         <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-7">
           <motion.div variants={fadeUp} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-semibold uppercase tracking-wider text-emerald-400" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Now Onboarding in West Bengal
+            {t('mechanic.hero.onboarding', 'Now Onboarding in West Bengal')}
           </motion.div>
 
           <motion.h1 variants={fadeUp} className="text-4xl sm:text-5xl md:text-6xl lg:text-[68px] font-bold font-['Outfit'] leading-[1.08] tracking-tight">
-            Your Skills,<br />
-            <span className="text-gradient-emerald">Their Need,</span><br />
-            <span style={{ color: 'var(--text-secondary)' }}>Your Profit.</span>
+            {t('mechanic.hero.heading1', 'Your Skills,')}<br />
+            <span className="text-gradient-emerald">{t('mechanic.hero.heading2', 'Their Need,')}</span><br />
+            <span style={{ color: 'var(--text-secondary)' }}>{t('mechanic.hero.heading3', 'Your Profit.')}</span>
           </motion.h1>
 
           <motion.p variants={fadeUp} className="text-base sm:text-lg max-w-md leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            Customers find you. Prices are pre-agreed. You show up, fix, and get paid instantly. Zero commission for the first 6 months.
+            {t('mechanic.hero.subheading', 'Customers find you. Prices are pre-agreed. You show up, fix, and get paid instantly. Zero commission for the first 6 months.')}
           </motion.p>
 
           <motion.div variants={fadeUp} className="flex flex-wrap gap-4">
             <Link to="/auth" className="btn-emerald flex items-center gap-2 group text-[15px]">
-              Start Earning Today
+              {t('mechanic.hero.startEarning', 'Start Earning Today')}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <a href="#how-it-works" className="btn-secondary flex items-center gap-2 text-[15px]">
-              See How It Works
+              {t('mechanic.hero.seeHowItWorks', 'See How It Works')}
               <ChevronDown className="w-4 h-4 animate-bounce" />
             </a>
           </motion.div>
@@ -135,15 +137,15 @@ export default function MechanicLanding() {
           >
             <div>
               <p className="text-2xl sm:text-3xl font-bold font-['Outfit']">{counter1.count}+</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Mechanics Joined</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('mechanic.hero.stats.mechanicsJoined', 'Mechanics Joined')}</p>
             </div>
             <div>
               <p className="text-2xl sm:text-3xl font-bold font-['Outfit']">{counter2.count}%</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Satisfaction Rate</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('mechanic.hero.stats.satisfactionRate', 'Satisfaction Rate')}</p>
             </div>
             <div>
               <p className="text-2xl sm:text-3xl font-bold font-['Outfit']">{counter3.count} min</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Avg. Response</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('mechanic.hero.stats.avgResponse', 'Avg. Response')}</p>
             </div>
           </motion.div>
         </motion.div>
@@ -168,10 +170,10 @@ export default function MechanicLanding() {
               <div className="px-5 pb-6 space-y-4">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-sm font-semibold">Sanjay Das</p>
+                    <p className="text-sm font-semibold">{t('mechanic.liveCard.name', 'Sanjay Das')}</p>
                     <p className="text-[11px] text-emerald-400 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Online • Kalyani
+                      {t('mechanic.liveCard.online', 'Online • Kalyani')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -186,9 +188,9 @@ export default function MechanicLanding() {
 
                 {/* Earnings */}
                 <div className="bg-gradient-to-r from-emerald-600/15 to-teal-600/15 rounded-2xl p-4" style={{ border: '1px solid rgba(16,185,129,0.15)' }}>
-                  <p className="text-[10px] text-emerald-300 uppercase tracking-wider font-semibold mb-1">Today's Earnings</p>
+                  <p className="text-[10px] text-emerald-300 uppercase tracking-wider font-semibold mb-1">{t('mechanic.liveCard.todaysEarnings', "Today's Earnings")}</p>
                   <p className="text-2xl font-bold font-['Outfit']">₹1,850</p>
-                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>4 jobs completed</p>
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>4 {t('mechanic.liveCard.jobsCompleted', 'jobs completed')}</p>
                 </div>
 
                 {/* Incoming Request */}
@@ -200,19 +202,19 @@ export default function MechanicLanding() {
                   style={{ background: 'var(--bg-card)', border: '1px solid rgba(239,68,68,0.2)', boxShadow: '0 0 20px rgba(239,68,68,0.05)' }}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <span className="bg-red-500/15 text-red-400 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">⚡ New Job</span>
+                    <span className="bg-red-500/15 text-red-400 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">{t('mechanic.liveCard.newJob', '⚡ New Job')}</span>
                     <span className="font-bold text-lg">₹250</span>
                   </div>
                   <p className="text-[10px] font-bold text-orange-400 mb-0.5 uppercase tracking-wide flex items-center gap-1">
-                    <Bike className="w-3 h-3" /> Royal Enfield Classic 350
+                    <Bike className="w-3 h-3" /> {t('mechanic.liveCard.bike', 'Royal Enfield Classic 350')}
                   </p>
-                  <p className="font-semibold text-sm mb-0.5">Flat Tire Repair</p>
+                  <p className="font-semibold text-sm mb-0.5">{t('mechanic.liveCard.jobName', 'Flat Tire Repair')}</p>
                   <p className="text-[11px] flex items-center gap-1 mb-3" style={{ color: 'var(--text-muted)' }}>
-                    <MapPin className="w-3 h-3" /> 1.4 km • <Clock className="w-3 h-3" /> 12 min away
+                    <MapPin className="w-3 h-3" /> {t('mechanic.liveCard.distEta', '1.4 km • 12 min away')}
                   </p>
                   <div className="flex gap-2">
-                    <button className="flex-1 bg-emerald-500 text-black font-bold py-2.5 rounded-xl text-xs hover:bg-emerald-400 transition-colors">Accept</button>
-                    <button className="flex-1 font-medium py-2.5 rounded-xl text-xs" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}>Decline</button>
+                    <button className="flex-1 bg-emerald-500 text-black font-bold py-2.5 rounded-xl text-xs hover:bg-emerald-400 transition-colors">{t('common.buttons.accept', 'Accept')}</button>
+                    <button className="flex-1 font-medium py-2.5 rounded-xl text-xs" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}>{t('common.buttons.decline', 'Decline')}</button>
                   </div>
                 </motion.div>
 
@@ -220,9 +222,9 @@ export default function MechanicLanding() {
                 <div className="opacity-60">
                   <div className="rounded-xl p-3 flex justify-between items-center" style={{ background: 'var(--bg-card)' }}>
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wide flex items-center gap-1 mb-0.5"><CarFront className="w-3 h-3" /> Hyundai i20</span>
-                      <span className="text-xs font-medium">Battery Jump Start</span>
-                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>35 min ago</p>
+                      <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wide flex items-center gap-1 mb-0.5"><CarFront className="w-3 h-3" /> {t('mechanic.liveCard.pastCar', 'Hyundai i20')}</span>
+                      <span className="text-xs font-medium">{t('mechanic.liveCard.pastJobName', 'Battery Jump Start')}</span>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('mechanic.liveCard.pastTime', '35 min ago')}</p>
                     </div>
                     <span className="text-xs text-emerald-400 font-semibold">₹450 ✓</span>
                   </div>
@@ -237,18 +239,18 @@ export default function MechanicLanding() {
       <section id="benefits" className="scroll-mt-24 relative z-10 py-16 sm:py-20 px-5 md:px-10" style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border-primary)', borderBottom: '1px solid var(--border-primary)' }}>
         <div className="max-w-7xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold font-['Outfit'] mb-4">Why Mechanics <span className="text-gradient-emerald">Love Us</span></h2>
-            <p style={{ color: 'var(--text-secondary)' }} className="max-w-lg mx-auto text-base">We built FixOnRoad to solve every pain-point local mechanics face daily.</p>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold font-['Outfit'] mb-4">{t('mechanic.features.title1', 'Why Mechanics')} <span className="text-gradient-emerald">{t('mechanic.features.title2', 'Love Us')}</span></h2>
+            <p style={{ color: 'var(--text-secondary)' }} className="max-w-lg mx-auto text-base">{t('mechanic.features.subheading', 'We built FixOnRoad to solve every pain-point local mechanics face daily.')}</p>
           </motion.div>
 
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-5">
             {[
-              { icon: <MapPin className="w-7 h-7 text-emerald-400" />, title: 'No Wasted Trips', desc: 'Get accurate GPS pins. You only travel when you accept a job near you. See distance and ETA before accepting.' },
-              { icon: <Banknote className="w-7 h-7 text-teal-400" />, title: 'Fixed Pricing, No Haggling', desc: 'Customers accept the price before booking. No bargaining at the roadside. Your rate = your earnings.' },
-              { icon: <ShieldCheck className="w-7 h-7 text-cyan-400" />, title: 'Instant Secure Payouts', desc: 'Instant daily settlements directly via UPI (PhonePe, Google Pay, Paytm) or direct bank transfer. Zero hold time.' },
-              { icon: <Zap className="w-7 h-7 text-yellow-400" />, title: 'Zero Commission (Launch)', desc: 'Keep 100% of every rupee during our launch phase. No hidden fees. No platform deductions.' },
-              { icon: <Users className="w-7 h-7 text-purple-400" />, title: 'Build Your Reputation', desc: 'Every 5-star review builds your profile. Top mechanics get priority in job dispatch.' },
-              { icon: <TrendingUp className="w-7 h-7 text-blue-400" />, title: 'Grow Your Business', desc: 'Track your earnings, completion rate, and customer feedback in a simple dashboard.' }
+              { icon: <MapPin className="w-7 h-7 text-emerald-400" />, title: t('mechanic.features.items.0.title', 'No Wasted Trips'), desc: t('mechanic.features.items.0.desc', 'Get accurate GPS pins. You only travel when you accept a job near you. See distance and ETA before accepting.') },
+              { icon: <Banknote className="w-7 h-7 text-teal-400" />, title: t('mechanic.features.items.1.title', 'Fixed Pricing, No Haggling'), desc: t('mechanic.features.items.1.desc', 'Customers accept the price before booking. No bargaining at the roadside. Your rate = your earnings.') },
+              { icon: <ShieldCheck className="w-7 h-7 text-cyan-400" />, title: t('mechanic.features.items.2.title', 'Instant Secure Payouts'), desc: t('mechanic.features.items.2.desc', 'Instant daily settlements directly via UPI (PhonePe, Google Pay, Paytm) or direct bank transfer. Zero hold time.') },
+              { icon: <Zap className="w-7 h-7 text-yellow-400" />, title: t('mechanic.features.items.3.title', 'Zero Commission (Launch)'), desc: t('mechanic.features.items.3.desc', 'Keep 100% of every rupee during our launch phase. No hidden fees. No platform deductions.') },
+              { icon: <Users className="w-7 h-7 text-purple-400" />, title: t('mechanic.features.items.4.title', 'Build Your Reputation'), desc: t('mechanic.features.items.4.desc', 'Every 5-star review builds your profile. Top mechanics get priority in job dispatch.') },
+              { icon: <TrendingUp className="w-7 h-7 text-blue-400" />, title: t('mechanic.features.items.5.title', 'Grow Your Business'), desc: t('mechanic.features.items.5.desc', 'Track your earnings, completion rate, and customer feedback in a simple dashboard.') }
             ].map((feat, i) => (
               <motion.div
                 key={i}
@@ -273,14 +275,14 @@ export default function MechanicLanding() {
       <section id="how-it-works" className="scroll-mt-24 relative z-10 py-16 sm:py-20 px-5 md:px-10">
         <div className="max-w-5xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold font-['Outfit'] mb-4">Start in <span className="text-gradient-emerald">3 Steps</span></h2>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold font-['Outfit'] mb-4">{t('mechanic.steps.title1', 'Start in')} <span className="text-gradient-emerald">{t('mechanic.steps.title2', '3 Steps')}</span></h2>
           </motion.div>
 
           <div className="grid sm:grid-cols-3 gap-8">
             {[
-              { step: '01', title: 'Sign Up Free', desc: 'Register with your phone number. Choose your focus: Two-Wheeler Specialist, Car & EV Specialist, or Multi-Vehicle Technician. Upload Aadhaar/PAN for verification. Takes 2 minutes.' },
-              { step: '02', title: 'Go Online', desc: 'Toggle your status to "Online" when ready. You\'ll receive jobs within your radius.' },
-              { step: '03', title: 'Fix & Earn', desc: 'Accept a job, ride to the pin, fix the vehicle (bike or car), get paid. It\'s that simple.' },
+              { step: '01', title: t('mechanic.steps.items.0.title', 'Sign Up Free'), desc: t('mechanic.steps.items.0.desc', 'Register with your phone number. Choose your focus: Two-Wheeler Specialist, Car & EV Specialist, or Multi-Vehicle Technician. Upload Aadhaar/PAN for verification. Takes 2 minutes.') },
+              { step: '02', title: t('mechanic.steps.items.1.title', 'Go Online'), desc: t('mechanic.steps.items.1.desc', 'Toggle your status to "Online" when ready. You\'ll receive jobs within your radius.') },
+              { step: '03', title: t('mechanic.steps.items.2.title', 'Fix & Earn'), desc: t('mechanic.steps.items.2.desc', 'Accept a job, ride to the pin, fix the vehicle (bike or car), get paid. It\'s that simple.') },
             ].map((item, i) => (
               <motion.div
                 key={i}
@@ -302,10 +304,10 @@ export default function MechanicLanding() {
       {/* Testimonials */}
       <section className="relative z-10 py-16 sm:py-20 px-5 md:px-10" style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border-primary)' }}>
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold font-['Outfit'] mb-12">What <span className="text-gradient-emerald">Mechanics Say</span></h2>
+          <h2 className="text-3xl sm:text-4xl font-bold font-['Outfit'] mb-12">{t('mechanic.reviews.title1', 'What')} <span className="text-gradient-emerald">{t('mechanic.reviews.title2', 'Mechanics Say')}</span></h2>
 
           <div className="relative h-48">
-            {testimonials.map((t, i) => (
+            {testimonials.map((testim, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 20 }}
@@ -317,12 +319,12 @@ export default function MechanicLanding() {
                 className={`w-full ${activeTestimonial === i ? 'relative' : 'absolute inset-0 pointer-events-none'}`}
               >
                 <div className="flex justify-center gap-1 mb-4">
-                  {Array.from({ length: t.stars }).map((_, j) => (
+                  {Array.from({ length: testim.stars }).map((_, j) => (
                     <Star key={j} className="w-5 h-5 text-yellow-400 fill-yellow-400" />
                   ))}
                 </div>
-                <p className="text-lg sm:text-xl md:text-2xl font-medium italic mb-4" style={{ color: 'var(--text-secondary)' }}>"{t.text}"</p>
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>— {t.name}, <span className="text-emerald-400">{t.area}</span></p>
+                <p className="text-lg sm:text-xl md:text-2xl font-medium italic mb-4" style={{ color: 'var(--text-secondary)' }}>"{t(`mechanic.reviews.items.${i}.text`, testim.text)}"</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>— {t(`mechanic.reviews.items.${i}.name`, testim.name)}, <span className="text-emerald-400">{t(`mechanic.reviews.items.${i}.location`, testim.area)}</span></p>
               </motion.div>
             ))}
           </div>
@@ -345,7 +347,7 @@ export default function MechanicLanding() {
       <section className="relative z-10 py-16 sm:py-20 px-5 md:px-10" style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border-primary)', borderBottom: '1px solid var(--border-primary)' }}>
         <div className="max-w-3xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold font-['Outfit'] mb-4">Frequently Asked <span className="text-gradient-emerald">Questions</span></h2>
+            <h2 className="text-3xl sm:text-4xl font-bold font-['Outfit'] mb-4">{t('mechanic.faq.title1', 'Frequently Asked')} <span className="text-gradient-emerald">{t('mechanic.faq.title2', 'Questions')}</span></h2>
           </motion.div>
 
           <div className="space-y-4">
@@ -363,7 +365,7 @@ export default function MechanicLanding() {
                   onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
                   className="w-full px-6 py-5 text-left flex justify-between items-center gap-4 hover:bg-white/5 transition-colors"
                 >
-                  <span className="font-bold text-[15px]">{faq.q}</span>
+                  <span className="font-bold text-[15px]">{t(`mechanic.faq.items.${idx}.question`, faq.q)}</span>
                   {openFaq === idx ? <Minus className="w-5 h-5 text-emerald-400 shrink-0" /> : <Plus className="w-5 h-5 text-gray-400 shrink-0" />}
                 </button>
                 <AnimatePresence>
@@ -375,7 +377,7 @@ export default function MechanicLanding() {
                       className="px-6"
                     >
                       <p className="pb-5 text-[15px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                        {faq.a}
+                        {t(`mechanic.faq.items.${idx}.answer`, faq.a)}
                       </p>
                     </motion.div>
                   )}
@@ -395,13 +397,13 @@ export default function MechanicLanding() {
           className="max-w-4xl mx-auto text-center"
         >
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold font-['Outfit'] mb-6">
-            Ready to <span className="text-gradient-emerald">Earn More?</span>
+            {t('mechanic.cta.title1', 'Ready to')} <span className="text-gradient-emerald">{t('mechanic.cta.title2', 'Earn More?')}</span>
           </h2>
           <p className="text-base sm:text-lg mb-10 max-w-lg mx-auto" style={{ color: 'var(--text-secondary)' }}>
-            Join 500+ mechanics already earning with FixOnRoad. Registration is free and takes 2 minutes.
+            {t('mechanic.cta.desc', 'Join 500+ mechanics already earning with FixOnRoad. Registration is free and takes 2 minutes.')}
           </p>
           <Link to="/auth" className="inline-flex items-center gap-2 btn-emerald px-10 py-5 text-lg group">
-            Join as Partner — It's Free
+            {t('mechanic.cta.button', "Join as Partner — It's Free")}
             <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
           </Link>
         </motion.div>
