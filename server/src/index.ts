@@ -23,6 +23,6 @@ const io = new Server(server, {
 
 setupSockets(io);
 
-server.listen(PORT, () => {
+server.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`Server listening on port ${PORT}`);
 });
