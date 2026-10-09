@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, Star, Clock, ChevronRight, Zap, Droplets, Battery, Link2, Cog, AlertTriangle, PackageOpen, Wrench, Key, Truck, CarFront, Bike } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { useAuth } from '../context/AuthContext';
 
 /* ===== Service Data ===== */
 type VehicleType = 'bike' | 'car';
@@ -185,10 +186,20 @@ export default function ServicesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  useState(() => {
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
     const t = setTimeout(() => setIsLoading(false), 800);
+    
+    // Auto-select service if passed in URL
+    const serviceId = searchParams.get('serviceId');
+    if (serviceId) {
+      const svc = SERVICES.find(s => s.id === serviceId);
+      if (svc) setSelectedService(svc);
+    }
+    
     return () => clearTimeout(t);
-  });
+  }, [searchParams]);
 
   const filtered = useMemo(() => {
     return SERVICES.filter(s => {
@@ -200,13 +211,24 @@ export default function ServicesPage() {
 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
 
+  const { user, isAuthenticated } = useAuth();
+
   const handleProceed = (serviceId: string) => {
+    if (!isAuthenticated) {
+      navigate(`/auth?redirect=/services&serviceId=${serviceId}`);
+      return;
+    }
     const svc = SERVICES.find(s => s.id === serviceId);
     if (svc) setSelectedService(svc);
   };
 
   const handleCheckout = () => {
-    if (selectedService) navigate('/payment', { state: { service: selectedService } });
+    if (!selectedService) return;
+    if (!user) {
+      navigate('/auth', { state: { from: { pathname: '/services' }, service: selectedService } });
+      return;
+    }
+    navigate('/payment', { state: { service: selectedService } });
   };
 
   return (

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { User } from '../models/User';
+import { Mechanic } from '../models/Mechanic';
 import { requireAuth } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -38,22 +39,33 @@ router.use(requireAuth);
 
 router.get('/', async (req, res, next) => {
   try {
-    const user = await User.findById(req.user?.userId);
+    const Model: any = req.user?.role === 'mechanic' ? Mechanic : User;
+    const user: any = await Model.findById(req.user?.userId);
+    
     if (!user) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found' } });
     }
-    res.json({ 
+    
+    const responseData: any = {
       id: user._id, 
       phone: user.phone, 
       name: user.name, 
       role: user.role, 
       email: user.email,
-      username: user.username,
-      city: user.city,
-      age: user.age,
-      language: user.language,
-      isTwoFactorEnabled: user.isTwoFactorEnabled
-    });
+    };
+
+    if (user.role === 'mechanic') {
+      responseData.workshopName = (user as any).workshopName;
+      responseData.serviceCategories = (user as any).serviceCategories;
+      responseData.isAvailable = (user as any).isAvailable;
+      responseData.rating = (user as any).rating;
+      responseData.currentLocation = (user as any).currentLocation;
+    } else {
+      responseData.savedLocations = (user as any).savedLocations;
+      responseData.activeOrderId = (user as any).activeOrderId;
+    }
+
+    res.json(responseData);
   } catch (error) {
     next(error);
   }
@@ -61,17 +73,31 @@ router.get('/', async (req, res, next) => {
 
 router.patch('/', async (req, res, next) => {
   try {
-    const { name, email, phone, username, city, age, language } = req.body;
-    const parsedAge = age ? Number(age) : undefined;
-    const finalPhone = phone ? phone : undefined;
-    const finalUsername = username ? username : undefined;
+    const Model: any = req.user?.role === 'mechanic' ? Mechanic : User;
+    const user: any = await Model.findById(req.user?.userId);
     
-    const user = await User.findByIdAndUpdate(
+    if (!user) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found' } });
+    }
+
+    // Prepare update data based on role
+    const updateData: any = {};
+    if (req.body.name !== undefined) updateData.name = req.body.name;
+    if (req.body.phone !== undefined) updateData.phone = req.body.phone;
+
+    if (req.user?.role === 'mechanic') {
+      if (req.body.workshopName !== undefined) updateData.workshopName = req.body.workshopName;
+      if (req.body.isAvailable !== undefined) updateData.isAvailable = req.body.isAvailable;
+      if (req.body.currentLocation !== undefined) updateData.currentLocation = req.body.currentLocation;
+    }
+
+    const updated: any = await Model.findByIdAndUpdate(
       req.user?.userId,
-      { $set: { name, email, phone: finalPhone, username: finalUsername, city, age: parsedAge, language } },
+      { $set: updateData },
       { new: true, runValidators: true }
     );
-    res.json({ id: user?._id, name: user?.name, email: user?.email, phone: user?.phone, role: user?.role, username: user?.username, city: user?.city, age: user?.age, language: user?.language });
+    
+    res.json({ success: true, user: updated });
   } catch (error) {
     next(error);
   }
@@ -79,7 +105,8 @@ router.patch('/', async (req, res, next) => {
 
 router.patch('/password', async (req, res, next) => {
   try {
-    const user = await User.findById(req.user?.userId);
+    const Model: any = req.user?.role === 'mechanic' ? Mechanic : User;
+    const user: any = await Model.findById(req.user?.userId);
     if (!user) {
       return res.status(404).json({ error: { message: 'User not found' } });
     }
@@ -90,7 +117,7 @@ router.patch('/password', async (req, res, next) => {
     });
     const hashedPassword = await bcrypt.hash(password, 10);
     
-    await User.findByIdAndUpdate(
+    await Model.findByIdAndUpdate(
       req.user?.userId,
       { $set: { password: hashedPassword } },
       { runValidators: true }
@@ -104,7 +131,8 @@ router.patch('/password', async (req, res, next) => {
 
 router.get('/2fa/status', async (req, res, next) => {
   try {
-    const user = await User.findById(req.user?.userId);
+    const Model: any = req.user?.role === 'mechanic' ? Mechanic : User;
+    const user: any = await Model.findById(req.user?.userId);
     if (!user) return res.status(404).json({ error: { message: 'User not found' } });
     res.json({ isTwoFactorEnabled: user.isTwoFactorEnabled });
   } catch (error) {
@@ -114,7 +142,8 @@ router.get('/2fa/status', async (req, res, next) => {
 
 router.post('/2fa/generate', async (req, res, next) => {
   try {
-    const user = await User.findById(req.user?.userId);
+    const Model: any = req.user?.role === 'mechanic' ? Mechanic : User;
+    const user: any = await Model.findById(req.user?.userId);
     if (!user) return res.status(404).json({ error: { message: 'User not found' } });
 
     const secret = authenticator.generateSecret();
@@ -133,7 +162,8 @@ router.post('/2fa/generate', async (req, res, next) => {
 router.post('/2fa/verify', async (req, res, next) => {
   try {
     const { code } = req.body;
-    const user = await User.findById(req.user?.userId);
+    const Model: any = req.user?.role === 'mechanic' ? Mechanic : User;
+    const user: any = await Model.findById(req.user?.userId);
     if (!user || !user.twoFactorSecret) {
       return res.status(400).json({ error: { message: '2FA generation required first' } });
     }
@@ -154,7 +184,8 @@ router.post('/2fa/verify', async (req, res, next) => {
 
 router.post('/2fa/disable', async (req, res, next) => {
   try {
-    const user = await User.findById(req.user?.userId);
+    const Model: any = req.user?.role === 'mechanic' ? Mechanic : User;
+    const user: any = await Model.findById(req.user?.userId);
     if (!user) return res.status(404).json({ error: { message: 'User not found' } });
 
     user.isTwoFactorEnabled = false;
@@ -169,53 +200,6 @@ router.post('/2fa/disable', async (req, res, next) => {
 
 
 
-import { Mechanic } from '../models/Mechanic';
-
-router.get('/mechanic', async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user?.userId);
-    if (!user || user.role !== 'mechanic') {
-      return res.status(403).json({ error: { message: 'Only mechanics have a mechanic profile' } });
-    }
-    const mechanic = await Mechanic.findOne({ userId: user._id });
-    if (!mechanic) {
-      return res.status(404).json({ error: { message: 'Mechanic profile not found' } });
-    }
-    res.json(mechanic);
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.patch('/mechanic', async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user?.userId);
-    if (!user || user.role !== 'mechanic') {
-      return res.status(403).json({ error: { message: 'Only mechanics have a mechanic profile' } });
-    }
-    const { garageName, isOnline, specializations, lat, lng } = req.body;
-    
-    let updateData: any = {};
-    if (garageName !== undefined) updateData.garageName = garageName;
-    if (isOnline !== undefined) updateData.isOnline = isOnline;
-    if (specializations !== undefined) updateData.specializations = specializations;
-    if (lat !== undefined && lng !== undefined) {
-      updateData.location = {
-        type: 'Point',
-        coordinates: [Number(lng), Number(lat)]
-      };
-      updateData.locationUpdatedAt = new Date();
-    }
-    
-    const mechanic = await Mechanic.findOneAndUpdate(
-      { userId: user._id },
-      { $set: updateData },
-      { new: true, runValidators: true }
-    );
-    res.json(mechanic);
-  } catch (error) {
-    next(error);
-  }
-});
+// Removed legacy /mechanic routes as they are now merged into /
 
 export const meRouter = router;

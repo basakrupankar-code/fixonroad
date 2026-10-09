@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const orderSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  mechanicId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  mechanicId: { type: mongoose.Schema.Types.ObjectId, ref: 'Mechanic' },
   serviceDetails: {
     serviceType: { type: String, required: true },
     basePrice: { type: Number, required: true },

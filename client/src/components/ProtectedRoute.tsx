@@ -9,10 +9,10 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0B0F17] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
@@ -29,7 +29,10 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role as any)) {
-    // role not authorized so redirect to home page
+    // role not authorized so redirect
+    if (user.role === 'mechanic') {
+      return <Navigate to="/mechanic-dashboard" replace />;
+    }
     return <Navigate to="/" replace />;
   }
 

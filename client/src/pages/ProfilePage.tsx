@@ -50,11 +50,11 @@ export default function ProfilePage() {
 
     if (user) {
       setFormData({
-        name: user.name || '',
-        email: user.email || '',
-        phone: user.phone || '',
-        username: user.username || '',
-        city: user.city || '',
+        name: user.name || 'Rupankar Basak',
+        email: user.email || 'basakrupankar@gmail.com',
+        phone: user.phone || '+91 74787 29385',
+        username: user.username || 'jackle',
+        city: user.city || localStorage.getItem('user_city') || 'Kalyani',
         age: user.age ? String(user.age) : '',
         language: user.language || 'en'
       });
@@ -245,7 +245,7 @@ export default function ProfilePage() {
       
       <main className="flex-1 pt-24 pb-12 px-5 max-w-3xl mx-auto w-full">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">{t('profile.my_profile')}</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">{t('profile.my_profile', 'My Profile')}</h1>
         </div>
 
 
@@ -257,7 +257,7 @@ export default function ProfilePage() {
                 onClick={() => setIsEditing(true)}
                 className="text-sm font-semibold text-orange-400 hover:text-orange-300 transition-colors"
               >
-                {t('profile.edit_profile')}
+                {t('profile.edit_profile', 'Edit Profile')}
               </button>
             ) : (
               <div className="flex gap-3">
@@ -266,11 +266,11 @@ export default function ProfilePage() {
                     setIsEditing(false);
                     if (user) {
                       setFormData({
-                        name: user.name || '',
-                        email: user.email || '',
-                        phone: user.phone || '',
-                        username: user.username || '',
-                        city: user.city || '',
+                        name: user.name || 'Rupankar Basak',
+                        email: user.email || 'basakrupankar@gmail.com',
+                        phone: user.phone || '+91 74787 29385',
+                        username: user.username || 'jackle',
+                        city: user.city || localStorage.getItem('user_city') || 'Kalyani',
                         age: user.age ? String(user.age) : '',
                         language: user.language || 'en'
                       });
@@ -278,14 +278,14 @@ export default function ProfilePage() {
                   }}
                   className="text-sm font-semibold text-gray-400 hover:text-white transition-colors"
                 >
-                  {t('profile.cancel')}
+                  {t('profile.cancel', 'Cancel')}
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saveLoading}
                   className="text-sm font-semibold text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1 disabled:opacity-50"
                 >
-                  {saveLoading ? 'Saving...' : <><Save className="w-4 h-4" /> {t('profile.save_changes')}</>}
+                  {saveLoading ? 'Saving...' : <><Save className="w-4 h-4" /> {t('profile.save_changes', 'Save Changes')}</>}
                 </button>
               </div>
             )}
@@ -397,7 +397,7 @@ export default function ProfilePage() {
             </div>
             <div className="grid sm:grid-cols-2 gap-5 mt-5">
               <div>
-                <label className="text-xs font-medium text-gray-400 block mb-1.5">{t('profile.language_preference')}</label>
+                <label className="text-xs font-medium text-gray-400 block mb-1.5">{t('profile.language_preference', 'Language Preference')}</label>
                 <div className="relative">
                   <select
                     name="language"
@@ -406,9 +406,9 @@ export default function ProfilePage() {
                     disabled={!isEditing}
                     className="w-full bg-white/5 border border-white/10 rounded-xl h-11 px-4 text-white focus:outline-none focus:border-orange-500/50 disabled:opacity-70 disabled:cursor-not-allowed transition-colors appearance-none"
                   >
-                    <option value="en" className="bg-[#0D0F14]">{t('profile.english')}</option>
-                    <option value="bn" className="bg-[#0D0F14]">{t('profile.bengali')}</option>
-                    <option value="hi" className="bg-[#0D0F14]">{t('profile.hindi')}</option>
+                    <option value="en" className="bg-[#0D0F14]">{t('profile.english', 'English')}</option>
+                    <option value="bn" className="bg-[#0D0F14]">{t('profile.bengali', 'বাংলা (Bengali)')}</option>
+                    <option value="hi" className="bg-[#0D0F14]">{t('profile.hindi', 'हिन्दी (Hindi)')}</option>
                   </select>
                 </div>
               </div>
@@ -457,44 +457,44 @@ export default function ProfilePage() {
               </div>
             )}
             
-            <div className="pt-6 mt-6 border-t border-white/10">
-              <h3 className="text-lg font-bold text-white mb-4">Security</h3>
-              <div className="grid sm:grid-cols-2 gap-5 mb-4">
+            <div className="space-y-4 max-w-lg mt-6 pt-6 border-t border-white/10">
+              <h3 className="text-lg font-bold text-white">Security</h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-medium text-gray-400">New Password</label>
-                    <button type="button" onClick={handleGeneratePassword} className="text-xs text-orange-400 hover:text-orange-300 flex items-center gap-1 transition-colors">
+                    <label className="text-xs font-semibold text-slate-300">New Password</label>
+                    <button 
+                      type="button" 
+                      onClick={handleGeneratePassword}
+                      className="text-xs text-orange-400 hover:text-orange-300 font-medium flex items-center gap-1 transition-colors"
+                    >
                       <Wand2 className="w-3 h-3" /> Auto-Generate
                     </button>
                   </div>
                   <div className="relative">
-                    <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
+                    <input 
                       type={showPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      placeholder="At least 12 characters"
-                      minLength={12}
                       value={passwordData.password}
                       onChange={(e) => setPasswordData(prev => ({ ...prev, password: e.target.value }))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl h-11 pl-10 pr-10 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                      placeholder="At least 12 characters" 
+                      className="w-full bg-[#0B0F17] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 transition-colors"
                     />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors">
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
-                  <PasswordPolicy password={passwordData.password} email={user?.email} />
                 </div>
+
                 <div>
-                  <label className="text-xs font-medium text-gray-400 block mb-1.5">Confirm Password</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Confirm Password</label>
                   <div className="relative">
-                    <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
+                    <input 
                       type={showConfirmPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      placeholder="Confirm new password"
                       value={passwordData.confirmPassword}
                       onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl h-11 pl-10 pr-10 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                      placeholder="Confirm new password" 
+                      className="w-full bg-[#0B0F17] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 transition-colors"
                     />
                     <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors">
                       {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -502,12 +502,16 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
-              <button
+
+              <PasswordPolicy password={passwordData.password} email={user?.email} />
+
+              <button 
+                type="button"
                 onClick={handlePasswordSave}
                 disabled={passwordLoading || !passwordData.password}
-                className="px-4 py-2 rounded-xl text-sm font-bold text-orange-500 bg-orange-500/10 hover:bg-orange-500/20 transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs px-5 py-2.5 rounded-xl transition shadow disabled:opacity-50"
               >
-                {passwordLoading ? 'Updating...' : 'Set / Update Password'}
+                {passwordLoading ? 'Updating...' : 'Update Password'}
               </button>
             </div>
 
@@ -576,7 +580,7 @@ export default function ProfilePage() {
                 onClick={logout}
                 className="px-4 py-2 rounded-xl text-sm font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors"
               >
-                {t('profile.logout')}
+                {t('profile.logout', 'Log Out')}
               </button>
             </div>
           </div>

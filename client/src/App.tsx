@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import {
-  BrowserRouter, Routes, Route, Link, useLocation,
+  BrowserRouter, Routes, Route, Link, useLocation, useNavigate,
 } from "react-router-dom";
 import {
   motion, useScroll, useTransform,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from './context/AuthContext';
+import { LocationProvider, useLocationContext } from './context/LocationContext';
 import { useTranslation } from 'react-i18next';
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -22,6 +23,7 @@ import PaymentPage from "./pages/PaymentPage";
 import ProfilePage from "./pages/ProfilePage";
 import HowItWorks from "./components/HowItWorks";
 import NotFoundPage from "./pages/NotFoundPage";
+import MechanicPortal from "./pages/Mechanic";
 
 /* ══════════════════════════════════════════════
    REUSABLE ANIMATION PRIMITIVES
@@ -90,9 +92,12 @@ function Marquee({ items }: { items: string[] }) {
 ══════════════════════════════════════════════ */
 function LiveTracker() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [eta, setEta] = useState(12);
   const [distance, setDistance] = useState(2.4);
   const [status, setStatus] = useState<"searching" | "found" | "arriving">("searching");
+  
+  const orderId = localStorage.getItem('active_order_id') || '6ac8e7e0';
 
   useEffect(() => {
     const t1 = setTimeout(() => setStatus("found"), 2000);
@@ -110,11 +115,15 @@ function LiveTracker() {
   }, [status]);
 
   return (
-    <div className="glass-panel rounded-2xl p-6 relative overflow-hidden" style={{ border: "1px solid rgba(249,115,22,0.2)" }}>
-      <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-amber-500/5 pointer-events-none" />
+    <div 
+      onClick={() => navigate(`/track/${orderId}`)}
+      className="glass-panel rounded-2xl p-6 relative overflow-hidden cursor-pointer transition-all duration-300 hover:border-orange-500/50 hover:shadow-[0_0_20px_rgba(249,115,22,0.15)] group" 
+      style={{ border: "1px solid rgba(249,115,22,0.2)" }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-amber-500/5 pointer-events-none group-hover:from-orange-500/10 group-hover:to-amber-500/10 transition-colors" />
       <div className="relative z-10 space-y-5">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-[17px]">{t('home.hero.liveTracker.title', 'Live Dispatch Radar')}</h3>
+          <h3 className="font-bold text-[17px] group-hover:text-orange-400 transition-colors">{t('home.hero.liveTracker.title', 'Live Dispatch Radar')}</h3>
           <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 1.5 }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
             <span className="w-2 h-2 rounded-full bg-emerald-500" /> {t('home.hero.liveTracker.live', 'Live')}
           </motion.span>
@@ -141,6 +150,9 @@ function LiveTracker() {
           <div className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide ${status === "searching" ? "bg-yellow-500/15 text-yellow-400" : status === "found" ? "bg-orange-500/15 text-orange-400" : "bg-emerald-500/15 text-emerald-400"}`}>
             {status === "searching" ? t('home.hero.liveTracker.statusSearching', 'Searching') : status === "found" ? t('home.hero.liveTracker.statusMatched', 'Matched') : t('home.hero.liveTracker.statusEnRoute', 'En Route')}
           </div>
+        </div>
+        <div className="text-center pt-2">
+          <p className="text-xs text-orange-500/80 font-medium group-hover:text-orange-400 transition-colors">Tap to view live route map &rarr;</p>
         </div>
       </div>
     </div>
@@ -182,7 +194,7 @@ function RiderLanding() {
   const { t } = useTranslation();
   const [introShown, setIntroShown] = useState(false);
   const [introDone, setIntroDone] = useState(false);
-  const [locationState, setLocationState] = useState<'idle' | 'locating' | 'found'>('idle');
+  const { address, city, isLocating, fetchLocation } = useLocationContext();
 
   useEffect(() => {
     document.title = t('home.hero.titleTag', 'FixOnRoad — On-Demand Roadside Help for Bikes & Cars');
@@ -194,13 +206,6 @@ function RiderLanding() {
   const handleIntroDone = () => {
     sessionStorage.setItem("for_intro_seen", "1");
     setIntroDone(true);
-  };
-
-  const handleLocate = () => {
-    setLocationState('locating');
-    setTimeout(() => {
-      setLocationState('found');
-    }, 1500);
   };
 
   /* Hero parallax */
@@ -242,7 +247,7 @@ function RiderLanding() {
           <div className="lg:col-span-7 space-y-7">
             <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: introDone ? 1 : 0, y: introDone ? 0 : 24 }} transition={{ delay: 0.1, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
               <span className="pill-badge">
-                <Zap className="w-3 h-3" /> {t('home.hero.liveIn', 'Live in Kalyani, West Bengal')} <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <Zap className="w-3 h-3" /> {t('home.hero.liveIn', 'Live in')} {city.split(',')[0]} <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               </span>
             </motion.div>
 
@@ -263,12 +268,17 @@ function RiderLanding() {
             {/* Quick Action Emergency Input */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: introDone ? 1 : 0, y: introDone ? 0 : 20 }} transition={{ delay: 0.75 }} className="w-full max-w-md p-1.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col sm:flex-row gap-2">
               <button 
-                onClick={handleLocate}
+                onClick={fetchLocation}
+                disabled={isLocating}
                 className="flex-1 h-12 bg-white/5 hover:bg-white/10 text-white rounded-xl flex items-center justify-center gap-2 transition-colors border border-white/10"
               >
-                {locationState === 'idle' && <><Crosshair className="w-4 h-4 text-orange-400" /> {t('home.hero.useCurrentLocation', 'Use Current Location')}</>}
-                {locationState === 'locating' && <><span className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" /> {t('home.hero.locating', 'Locating...')}</>}
-                {locationState === 'found' && <><MapPin className="w-4 h-4 text-emerald-400" /> {t('home.hero.kalyaniHighway', 'Kalyani Highway')}</>}
+                {isLocating ? (
+                  <><span className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" /> {t('home.hero.locating', 'Locating...')}</>
+                ) : address && address !== 'Detecting location...' ? (
+                  <><MapPin className="w-4 h-4 text-emerald-400" /> {city.split(',')[0]}</>
+                ) : (
+                  <><Crosshair className="w-4 h-4 text-orange-400" /> {t('home.hero.useCurrentLocation', 'Use Current Location')}</>
+                )}
               </button>
               <Link to="/services" className="h-12 bg-orange-500 hover:bg-orange-600 text-white px-6 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shrink-0">
                 {t('home.hero.requestHelp', 'Request Help')} <ChevronRight className="w-4 h-4" />
@@ -418,72 +428,98 @@ function ScrollToTop() {
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./components/ProtectedRoute";
 import TrackingPage from "./pages/TrackingPage";
+import CartPage from "./pages/CartPage";
 import AIAssistant from "./components/AIAssistant";
 
 export default function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <BrowserRouter>
-          <ScrollToTop />
-          <Toaster 
-            position="top-center" 
-            reverseOrder={false} 
-            toastOptions={{
-              style: {
-                background: '#1A1D24',
-                color: '#fff',
-                border: '1px solid rgba(249,115,22,0.2)',
-                backdropFilter: 'blur(10px)',
-              },
-              success: {
-                iconTheme: {
-                  primary: '#10B981',
-                  secondary: '#fff',
+      <LocationProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <ScrollToTop />
+            <Toaster 
+              position="top-center" 
+              reverseOrder={false} 
+              toastOptions={{
+                style: {
+                  background: '#1A1D24',
+                  color: '#fff',
+                  border: '1px solid rgba(249,115,22,0.2)',
+                  backdropFilter: 'blur(10px)',
                 },
-              },
-              error: {
-                iconTheme: {
-                  primary: '#EF4444',
-                  secondary: '#fff',
+                success: {
+                  iconTheme: {
+                    primary: '#10B981',
+                    secondary: '#fff',
+                  },
                 },
-              },
-            }}
-          />
-          <Routes>
-            <Route path="/" element={<RiderLanding />} />
-            <Route path="/mechanic" element={<MechanicLanding />} />
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/services" element={<ServicesPage />} />
-            <Route 
-              path="/payment" 
-              element={
-                <ProtectedRoute allowedRoles={['customer']}>
-                  <PaymentPage />
-                </ProtectedRoute>
-              } 
+                error: {
+                  iconTheme: {
+                    primary: '#EF4444',
+                    secondary: '#fff',
+                  },
+                },
+              }}
             />
-            <Route 
-              path="/track/:orderId" 
-              element={
-                <ProtectedRoute allowedRoles={['customer']}>
-                  <TrackingPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/profile" 
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-          <AIAssistant />
-        </BrowserRouter>
-      </AuthProvider>
+            <Routes>
+              <Route path="/" element={<RiderLanding />} />
+              <Route path="/mechanic" element={<MechanicLanding />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route 
+                path="/services" 
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <ServicesPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/cart" 
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <CartPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/payment" 
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <PaymentPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/track/:orderId" 
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <TrackingPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/profile" 
+                element={
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route path="*" element={<NotFoundPage />} />
+              <Route 
+                path="/mechanic-dashboard" 
+                element={
+                  <ProtectedRoute allowedRoles={['mechanic']}>
+                    <MechanicPortal />
+                  </ProtectedRoute>
+                } 
+              />
+            </Routes>
+            <AIAssistant />
+          </BrowserRouter>
+        </AuthProvider>
+      </LocationProvider>
     </ThemeProvider>
   );
 }

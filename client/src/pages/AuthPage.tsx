@@ -32,7 +32,10 @@ export default function AuthPage() {
     phone: '',
     age: '',
     city: '',
-    acceptedCookies: false
+    acceptedCookies: false,
+    workshopName: '',
+    vehiclePlate: '',
+    upiId: ''
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -71,7 +74,15 @@ export default function AuthPage() {
       });
 
       login(data.user);
-      navigate(data.user.role === 'mechanic' ? '/mechanic' : '/services');
+      
+      const redirectUrl = searchParams.get('redirect');
+      const serviceId = searchParams.get('serviceId');
+      
+      if (redirectUrl) {
+        navigate(redirectUrl + (serviceId ? `?serviceId=${serviceId}` : ''));
+      } else {
+        navigate(data.user.role === 'mechanic' ? '/mechanic-dashboard' : '/services');
+      }
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -187,7 +198,15 @@ export default function AuthPage() {
       });
 
       login(data.user);
-      navigate(data.user.role === 'mechanic' ? '/mechanic' : '/services');
+      
+      const redirectUrl = searchParams.get('redirect');
+      const serviceId = searchParams.get('serviceId');
+      
+      if (redirectUrl) {
+        navigate(redirectUrl + (serviceId ? `?serviceId=${serviceId}` : ''));
+      } else {
+        navigate(data.user.role === 'mechanic' ? '/mechanic-dashboard' : '/services');
+      }
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Google sign in failed. Is your Firebase .env configured?');
@@ -203,7 +222,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden px-4 py-10" style={{ background: 'var(--bg-primary)' }}>
+    <div className="min-h-screen py-10 px-4 flex items-center justify-center relative overflow-y-auto bg-[#0B0F17]">
       {/* Background */}
       <div className="glow-orb w-[500px] h-[500px] -top-[20%] -left-[15%] bg-orange-600/15" />
       <div className="glow-orb w-[500px] h-[500px] -bottom-[20%] -right-[15%] bg-amber-600/10" style={{ animationDelay: '3s' }} />
@@ -216,54 +235,44 @@ export default function AuthPage() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md relative z-10"
       >
-        <Link to="/" className="inline-flex items-center gap-1 text-sm mb-6 transition-colors hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
-          <ChevronLeft className="w-4 h-4" /> {t('common.buttons.back', 'Back')}
-        </Link>
-
-        {/* Role Selector */}
-        {!registerSuccess && mode === 'login' && (
-          <div className="flex bg-[#111622]/90 border border-slate-800 rounded-2xl p-1 mb-4">
-            {(['customer', 'mechanic'] as const).map(r => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => { setRole(r); }}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${role === r
-                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                    : 'text-gray-400 hover:text-white border border-transparent'
-                  }`}
-              >
-                {r === 'customer' ? <CarFront className="w-4 h-4" /> : <Wrench className="w-4 h-4" />}
-                {r === 'customer' ? t('auth.driver_rider', 'Driver / Rider') : t('auth.mechanic_partner', 'Mechanic Partner')}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Mode Selector */}
-        {!registerSuccess && (
-          <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 mb-6">
-            <button
-              type="button"
-              onClick={() => { setMode('login'); }}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'login' ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
-            >
-              {t('auth.login_button')}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode('register'); }}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'register' ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
-            >
-              {t('auth.register_button')}
-            </button>
-          </div>
-        )}
-
-        <div className="bg-[#111622]/90 border border-slate-800 rounded-2xl p-7 sm:p-8 relative overflow-hidden shadow-2xl backdrop-blur-xl">
+        <div className="w-full max-w-md bg-[#121824] border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10">
           <div className="relative z-10">
+            {/* Top Navigation & Role Selection */}
+            <div className="flex items-center justify-between mb-6">
+              <button 
+                type="button" 
+                onClick={() => navigate('/')} 
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition"
+              >
+                <ChevronLeft className="w-3 h-3" /> Back
+              </button>
+              
+              {!registerSuccess && (
+                <div className="bg-[#0B0F17] p-1 rounded-xl border border-slate-800 flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => { setRole('customer'); setMode('login'); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      role === 'customer' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Driver / Rider
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setRole('mechanic'); setMode('login'); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      role === 'mechanic' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Mechanic Partner
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Logo */}
-            <div className="flex items-center gap-2 mb-7">
+            <div className="flex items-center justify-center gap-2 mb-6">
               <div className="p-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20">
                 <Wrench className="w-6 h-6 text-orange-400" />
               </div>
@@ -271,6 +280,26 @@ export default function AuthPage() {
                 FixOnRoad<span className="text-orange-500">.</span>
               </span>
             </div>
+
+            {/* Mode Selector */}
+            {!registerSuccess && (
+              <div className="flex bg-[#0B0F17] border border-slate-800 rounded-xl p-1 mb-6">
+                <button
+                  type="button"
+                  onClick={() => { setMode('login'); }}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'login' ? 'bg-white/10 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                >
+                  {t('auth.login_button', 'Login')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMode('register'); }}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'register' ? 'bg-white/10 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                >
+                  {t('auth.register_button', 'Register')}
+                </button>
+              </div>
+            )}
 
             <h2 className="text-2xl font-bold text-white mb-2">
               {registerSuccess
@@ -446,6 +475,55 @@ export default function AuthPage() {
                       </button>
                     </div>
                   </div>
+
+                  {role === 'mechanic' && (
+                    <div className="space-y-4 pt-2 border-t border-white/10">
+                      <div>
+                        <label className="text-xs font-medium block mb-1 text-gray-400">Workshop Name</label>
+                        <div className="relative">
+                          <Wrench className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <input
+                            type="text"
+                            value={registerData.workshopName}
+                            onChange={e => setRegisterData(d => ({ ...d, workshopName: e.target.value }))}
+                            className="w-full h-10 bg-white/5 border border-white/10 rounded-xl pl-9 pr-3 text-sm text-white focus:border-orange-500/50 outline-none"
+                            placeholder="Speedy Auto Garage"
+                            required={role === 'mechanic'}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-medium block mb-1 text-gray-400">Vehicle Plate</label>
+                          <div className="relative">
+                            <CarFront className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <input
+                              type="text"
+                              value={registerData.vehiclePlate}
+                              onChange={e => setRegisterData(d => ({ ...d, vehiclePlate: e.target.value }))}
+                              className="w-full h-10 bg-white/5 border border-white/10 rounded-xl pl-9 pr-3 text-sm text-white focus:border-orange-500/50 outline-none uppercase"
+                              placeholder="WB 02 AB 1234"
+                              required={role === 'mechanic'}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium block mb-1 text-gray-400">UPI ID for Payouts</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-gray-500 text-sm">₹</span>
+                            <input
+                              type="text"
+                              value={registerData.upiId}
+                              onChange={e => setRegisterData(d => ({ ...d, upiId: e.target.value }))}
+                              className="w-full h-10 bg-white/5 border border-white/10 rounded-xl pl-8 pr-3 text-sm text-white focus:border-orange-500/50 outline-none"
+                              placeholder="number@upi"
+                              required={role === 'mechanic'}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex items-center mt-2">
                     <input

@@ -19,16 +19,20 @@ const RegisterSchema = z.object({
   age: z.number().min(16, 'You must be at least 16 years old'),
   city: z.string().min(2, 'City is required'),
   acceptedCookies: z.boolean().refine(val => val === true, 'You must accept cookies'),
-  role: z.enum(['customer', 'mechanic'])
+  role: z.enum(['customer', 'mechanic']),
+  workshopName: z.string().optional(),
+  vehiclePlate: z.string().optional(),
+  upiId: z.string().optional()
 });
 
-const generateSession = async (userId: any, res: any) => {
+const generateSession = async (userId: any, role: 'customer' | 'mechanic', res: any) => {
   const sessionToken = crypto.randomBytes(32).toString('hex');
   const maxAgeMs = 7 * 24 * 60 * 60 * 1000; // 7 days
   const expiresAt = new Date(Date.now() + maxAgeMs);
 
   await Session.create({
     userId,
+    role,
     sessionToken,
     expiresAt
   });
@@ -46,27 +50,24 @@ router.post('/register', async (req, res, next) => {
   try {
     const data = RegisterSchema.parse(req.body);
 
-    const existingUser = await User.findOne({ 
-      $or: [{ email: data.email }, { phone: data.phone }, { username: data.username }] 
+    const Model: any = data.role === 'mechanic' ? Mechanic : User;
+
+    const existingUser = await Model.findOne({ 
+      $or: [{ email: data.email }, { phone: data.phone }, { name: data.name }] 
     });
 
     if (existingUser) {
-      return res.status(400).json({ error: { code: 'USER_EXISTS', message: 'Email, phone, or username already exists' } });
+      return res.status(400).json({ error: { code: 'USER_EXISTS', message: 'Email, phone, or name already exists' } });
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
-    const user = await User.create({
+    const user = await Model.create({
       ...data,
       password: hashedPassword,
-      isEmailVerified: true // For simplicity in this new auth system, auto-verify or handle later
     });
 
-    if (user.role === 'mechanic') {
-      await Mechanic.create({ userId: user._id });
-    }
-
-    await generateSession(user._id, res);
+    await generateSession(user._id, user.role, res);
 
     res.status(201).json({ 
       success: true,
@@ -76,9 +77,6 @@ router.post('/register', async (req, res, next) => {
         phone: user.phone, 
         name: user.name, 
         email: user.email,
-        username: user.username,
-        city: user.city,
-        age: user.age,
         role: user.role
       }
     });
@@ -95,7 +93,14 @@ router.post('/login', async (req, res, next) => {
       return res.status(400).json({ error: { message: 'Email and password are required' } });
     }
 
-    const user = await User.findOne({ email });
+    let user: any = await User.findOne({ email });
+    let isMechanic = false;
+
+    if (!user) {
+      user = await Mechanic.findOne({ email });
+      if (user) isMechanic = true;
+    }
+
     if (!user) {
       return res.status(401).json({ error: { message: 'Invalid credentials' } });
     }
@@ -109,7 +114,7 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).json({ error: { message: 'Invalid credentials' } });
     }
 
-    await generateSession(user._id, res);
+    await generateSession(user._id, user.role, res);
 
     res.json({
       success: true,
@@ -119,9 +124,6 @@ router.post('/login', async (req, res, next) => {
         phone: user.phone, 
         name: user.name, 
         email: user.email,
-        username: user.username,
-        city: user.city,
-        age: user.age,
         role: user.role
       }
     });
@@ -166,20 +168,20 @@ router.post('/google-login', async (req, res, next) => {
       return res.status(400).json({ error: { code: 'NO_EMAIL', message: 'Google account has no email' } });
     }
 
-    let user = await User.findOne({ email });
+    let user: any;
+    if (role === 'mechanic') {
+      user = await Mechanic.findOne({ email });
+    } else {
+      user = await User.findOne({ email });
+    }
 
     if (!user) {
-      user = await User.create({
+      const Model: any = role === 'mechanic' ? Mechanic : User;
+      user = await Model.create({
         email,
         name: name || 'Google User',
-        isEmailVerified: true,
         role: role === 'mechanic' ? 'mechanic' : 'customer',
-        acceptedCookies: true,
       });
-
-      if (user.role === 'mechanic') {
-        await Mechanic.create({ userId: user._id });
-      }
     } else {
       if (!user.name) {
         user.name = name || 'Google User';
@@ -187,7 +189,7 @@ router.post('/google-login', async (req, res, next) => {
       }
     }
 
-    await generateSession(user._id, res);
+    await generateSession(user._id, user.role, res);
 
     res.json({
       success: true,
@@ -196,9 +198,6 @@ router.post('/google-login', async (req, res, next) => {
         phone: user.phone, 
         name: user.name, 
         email: user.email,
-        username: user.username,
-        city: user.city,
-        age: user.age,
         role: user.role
       }
     });

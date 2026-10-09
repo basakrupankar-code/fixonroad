@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
 import { Session } from '../models/Session';
 import { User } from '../models/User';
 
@@ -22,24 +23,29 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       return res.status(401).json({ success: false, message: 'Unauthorized. Please log in.' });
     }
 
-    const session = await Session.findOne({ sessionToken: token }).populate('userId');
+    const session = await Session.findOne({ sessionToken: token });
     
     if (!session || session.expiresAt < new Date()) {
-      // If expired, maybe delete it
       if (session) {
         await Session.findByIdAndDelete(session._id);
       }
       return res.status(401).json({ success: false, message: 'Unauthorized. Session expired or invalid.' });
     }
 
-    const user = session.userId as any;
+    let user;
+    if (session.role === 'mechanic') {
+      user = await mongoose.model('Mechanic').findById(session.userId);
+    } else {
+      user = await User.findById(session.userId);
+    }
+
     if (!user) {
       return res.status(401).json({ success: false, message: 'Unauthorized. User not found.' });
     }
 
     req.user = {
       userId: user._id.toString(),
-      role: user.role
+      role: session.role
     };
 
     next();

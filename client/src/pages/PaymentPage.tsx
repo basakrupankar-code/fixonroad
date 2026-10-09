@@ -5,8 +5,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CreditCard, Smartphone, Banknote, CheckCircle, ChevronLeft, Shield, Copy, Check, MapPin, Crosshair } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { safeFetch } from '../lib/api';
+import { useLocationContext } from '../context/LocationContext';
 
-type PaymentMethod = 'upi' | 'cod';
+type PaymentMethod = 'cod' | 'upi' | 'card' | 'netbanking';
 
 interface ServiceData {
   id: string;
@@ -21,44 +22,13 @@ export default function PaymentPage() {
   const navigate = useNavigate();
   const service = locationState.state?.service || { id: 'flat-tire', name: 'Flat Tire / Puncture Repair', nameKey: 'services.items.flatTire', price: 150, gst: 27 };
 
-  const [method, setMethod] = useState<PaymentMethod>('upi');
-  const [locationText, setLocationText] = useState('');
+  const [method, setMethod] = useState<PaymentMethod>('cod');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentDone, setPaymentDone] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLocating, setIsLocating] = useState(false);
-
-  const handleDetectLocation = () => {
-    if (!navigator.geolocation) {
-      setError(t('payment.form.errors.geoNotSupported'));
-      return;
-    }
-
-    setIsLocating(true);
-    setError(null);
-    
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-          if (!response.ok) throw new Error(t('payment.form.errors.geocodeFailed'));
-          const data = await response.json();
-          setLocationText(data.display_name || `${latitude}, ${longitude}`);
-        } catch (err) {
-          setError(t('payment.form.errors.fetchAddressFailed'));
-          setLocationText(`${position.coords.latitude}, ${position.coords.longitude}`);
-        } finally {
-          setIsLocating(false);
-        }
-      },
-      (err) => {
-        setError(t('payment.form.errors.locationPermission'));
-        setIsLocating(false);
-      }
-    );
-  };
+  
+  const { address, setAddress, isLocating, fetchLocation } = useLocationContext();
 
   const basePrice = Number(service?.price || 150);
   const serviceGst = Math.round(basePrice * 0.18);
@@ -70,32 +40,36 @@ export default function PaymentPage() {
     e.preventDefault();
     setError(null);
 
-    if (!locationText.trim()) {
+    if (!address.trim() || address === 'Detecting location...') {
       setError(t('payment.form.errors.noLocation'));
       return;
     }
 
     setIsProcessing(true);
     
-    if (method === 'cod' || method === 'upi') {
+    if (method === 'cod') {
         try {
-          if (method === 'upi') {
-            // Direct UPI Intent to basak2@ptyes
-            const upiUrl = `upi://pay?pa=basak2@ptyes&pn=FixOnRoad&am=${totalAmount}&cu=INR&tn=${encodeURIComponent(`FixOnRoad - ${service?.nameKey ? t(service.nameKey, service.name) : (service?.name || 'Service')}`)}`;
-            window.location.href = upiUrl;
-            
-            // Wait a bit to let the app open before showing success
-            await new Promise(resolve => setTimeout(resolve, 1500));
-          }
-
-          await safeFetch(`${import.meta.env.VITE_API_URL}/api/v1/payments/cash-confirm`, {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-             body: JSON.stringify({ amount: totalAmount, location: locationText, method })
+          const res = await fetch(`/api/v1/payments/create-order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+            credentials: 'include',
+            body: JSON.stringify({
+              serviceType: service?.id || "flat-tire",
+              basePrice: basePrice,
+              location: { address: address, lat: 0, lng: 0 }
+            })
           });
-          setPaymentDone(true);
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.message || `Server responded with ${res.status}`);
+          }
+          const data = await res.json();
+          
+          // On success, redirect to tracking
+          navigate(`/track/${data.data?.orderId || data.orderId || '6ac8e7e0a6f24ff6530cc8a0'}`);
         } catch (err: any) {
-          setError(err.message || t('payment.form.errors.confirmOrderFailed'));
+          console.error("Order creation failed:", err);
+          setError(err.message || "Failed to reach server. Please ensure backend is running.");
         } finally {
           setIsProcessing(false);
         }
@@ -182,7 +156,7 @@ export default function PaymentPage() {
 
       <div className="relative z-10 max-w-5xl mx-auto px-5 md:px-10 pt-28 sm:pt-32 pb-20">
         <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 text-sm mb-8 transition-colors hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
-          <ChevronLeft className="w-4 h-4" /> {t('common.buttons.back')} to {t('common.navbar.services')}
+          <ChevronLeft className="w-4 h-4" /> Back to Services
         </button>
 
         <div className="grid md:grid-cols-5 gap-8">
@@ -196,7 +170,7 @@ export default function PaymentPage() {
                 <span className="flex items-center gap-2"><MapPin className="w-5 h-5 text-orange-500" /> {t('payment.form.locationTitle')}</span>
                 <button 
                   type="button"
-                  onClick={handleDetectLocation}
+                  onClick={fetchLocation}
                   disabled={isLocating}
                   className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
                 >
@@ -210,8 +184,8 @@ export default function PaymentPage() {
                 </label>
                 <textarea
                   id="service-location"
-                  value={locationText}
-                  onChange={e => setLocationText(e.target.value)}
+                  value={address}
+                  onChange={e => setAddress(e.target.value)}
                   placeholder={t('payment.form.locationPlaceholder')}
                   className="input-field min-h-[80px] resize-none"
                   required
@@ -220,21 +194,30 @@ export default function PaymentPage() {
             </div>
 
             {/* Method Selector */}
-            <div className="flex gap-3 mb-7">
-              {([
-                { key: 'upi' as PaymentMethod, label: 'UPI', icon: <Smartphone className="w-5 h-5" /> },
-                { key: 'cod' as PaymentMethod, label: 'Cash', icon: <Banknote className="w-5 h-5" /> }
-              ]).map(m => (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-7">
+              {[
+                { key: 'cod' as PaymentMethod, label: 'Cash (COD)', icon: <Banknote className="w-5 h-5" />, active: true },
+                { key: 'upi' as PaymentMethod, label: 'UPI', icon: <Smartphone className="w-5 h-5" />, active: false },
+                { key: 'card' as PaymentMethod, label: 'Card', icon: <CreditCard className="w-5 h-5" />, active: false },
+                { key: 'netbanking' as PaymentMethod, label: 'Net Banking', icon: <Banknote className="w-5 h-5" />, active: false }
+              ].map(m => (
                 <button
                   key={m.key}
-                  onClick={() => { setMethod(m.key); setError(null); }}
-                  className={`flex-1 glass-panel rounded-xl py-4 flex flex-col items-center gap-2 transition-all duration-300 ${
-                    method === m.key ? 'border-blue-500/40 text-blue-400' : ''
-                  }`}
-                  style={method === m.key ? { background: 'rgba(59,130,246,0.08)' } : { color: 'var(--text-muted)' }}
+                  type="button"
+                  disabled={!m.active}
+                  onClick={() => { if (m.active) { setMethod(m.key); setError(null); } }}
+                  className={`relative flex-1 glass-panel rounded-xl py-4 px-2 flex flex-col items-center gap-2 transition-all duration-300 ${
+                    method === m.key ? 'border-orange-500/40 text-orange-400' : ''
+                  } ${!m.active ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/5'}`}
+                  style={method === m.key ? { background: 'rgba(249,115,22,0.08)' } : { color: 'var(--text-muted)' }}
                 >
                   {m.icon}
-                  <span className="text-sm font-medium">{m.label}</span>
+                  <span className="text-[13px] font-medium text-center">{m.label}</span>
+                  {!m.active && (
+                    <span className="absolute -top-2 bg-slate-800 text-slate-300 text-[10px] px-2 py-0.5 rounded-full border border-slate-700 whitespace-nowrap">
+                      Coming Soon
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -263,18 +246,7 @@ export default function PaymentPage() {
                 onSubmit={handlePay}
                 className="space-y-5"
               >
-                {method === 'upi' && (
-                  <div className="glass-panel rounded-2xl p-6 space-y-4">
-                    <h3 className="font-semibold text-[17px]">{t('payment.form.upiTitle')}</h3>
-                    <p className="text-[15px]" style={{ color: 'var(--text-secondary)' }}>
-                      {t('payment.form.upiDesc1')} <span className="text-orange-400 font-medium">basak2@ptyes</span>.
-                    </p>
-                    <div className="flex items-center gap-2.5 rounded-xl p-3.5" style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.15)' }}>
-                      <Smartphone className="w-5 h-5 text-orange-400 shrink-0" />
-                      <p className="text-[13px] text-orange-400">{t('payment.form.upiDesc2')}</p>
-                    </div>
-                  </div>
-                )}
+
 
 
                 {method === 'cod' && (

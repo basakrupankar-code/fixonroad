@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wrench, Menu, X, Globe } from 'lucide-react';
+import { Wrench, Menu, X, Globe, MapPin, RefreshCw, ShoppingCart } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from '../context/AuthContext';
+import { useLocationContext } from '../context/LocationContext';
 
 // Helper for hash links across pages
 const HashLink = ({ to, children, className, onClick }: any) => {
@@ -39,6 +40,21 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const { city, isLocating, fetchLocation, setCity, setAddress } = useLocationContext();
+
+  const handleManualLocation = () => {
+    const override = window.prompt("Enter your breakdown city/location (e.g., Samudragar, West Bengal):", city);
+    if (override && override.trim() !== "") {
+      const formatted = override.trim();
+      setCity(formatted);
+      setAddress(formatted);
+      localStorage.setItem('user_city', formatted);
+      localStorage.setItem('user_address', formatted);
+      localStorage.setItem('breakdown_address', formatted);
+    }
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -49,20 +65,27 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
   // Close mobile menu on route change
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
-  const isMechanic = variant === 'mechanic';
+  const isMechanic = variant === 'mechanic' || user?.role === 'mechanic';
   const accentColor = 'text-orange-400';
 
-  const navLinks = isMechanic
-    ? [
-        { to: '/', label: t('nav.switchToRider', 'Switch to Rider/Driver View') },
-        { to: '/mechanic#benefits', label: t('nav.benefits', 'Benefits'), isAnchor: true },
-        { to: '/mechanic#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
-      ]
-    : [
-        { to: '/services', label: t('nav.services', 'Services') },
-        { to: '/mechanic', label: t('nav.forMechanics', 'For Mechanics') },
-        { to: '/#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
-      ];
+  let navLinks = [];
+  if (user?.role === 'mechanic') {
+    navLinks = [
+      { to: '/mechanic-dashboard', label: 'Partner Portal' },
+    ];
+  } else if (variant === 'mechanic' && !isAuthenticated) {
+    navLinks = [
+      { to: '/', label: t('nav.switchToRider', 'Switch to Rider/Driver View') },
+      { to: '/mechanic#benefits', label: t('nav.benefits', 'Benefits'), isAnchor: true },
+      { to: '/mechanic#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
+    ];
+  } else {
+    navLinks = [
+      { to: '/services', label: t('nav.services', 'Services') },
+      { to: '/mechanic', label: t('nav.forMechanics', 'For Mechanics') },
+      { to: '/#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
+    ];
+  }
 
   return (
     <>
@@ -91,6 +114,23 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
               </span>
             )}
           </Link>
+
+          {/* Location Picker (hidden on mobile) */}
+          {(user?.role === 'customer' || (!isAuthenticated && variant !== 'mechanic')) && (
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs ml-6">
+              <MapPin className="w-3.5 h-3.5 text-orange-400" />
+              <span 
+                className="text-gray-300 max-w-[120px] truncate cursor-pointer hover:text-white transition-colors"
+                onClick={handleManualLocation}
+                title="Click to manually override location"
+              >
+                {city.split(',')[0]}
+              </span>
+              <button onClick={fetchLocation} disabled={isLocating} className="hover:text-white transition-colors disabled:opacity-50 ml-1">
+                <RefreshCw className={`w-3.5 h-3.5 text-gray-400 ${isLocating ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          )}
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-7 text-[15px] font-medium" style={{ color: 'var(--text-secondary)' }}>
@@ -127,6 +167,19 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                 <button onClick={() => i18n.changeLanguage('hi')} className={`w-full text-left px-4 py-2 text-sm hover:bg-white/5 ${i18n.language === 'hi' ? 'text-orange-400' : 'text-gray-300'}`}>Hindi</button>
               </div>
             </div>
+
+            {/* Cart Icon (only for authenticated customer) */}
+            {isAuthenticated && user?.role === 'customer' && (
+              <div className="relative">
+                <Link 
+                  to="/cart"
+                  className="relative p-2 rounded-xl hover:bg-white/5 transition-colors text-gray-300 hover:text-white inline-block"
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                  <span className="absolute top-1 right-1 w-4 h-4 bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border border-[#0B0F17]">1</span>
+                </Link>
+              </div>
+            )}
 
             {/* User Profile / Logout or Sign In */}
             {isAuthenticated && user ? (
