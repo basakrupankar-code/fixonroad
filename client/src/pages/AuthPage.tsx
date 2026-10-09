@@ -67,7 +67,7 @@ export default function AuthPage() {
 
     setIsLoading(true);
     try {
-      const data = await safefetch((import.meta.env.VITE_API_URL || '') + '/api/v1/auth/login', {
+      const data = await safeFetch('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -108,7 +108,7 @@ export default function AuthPage() {
         role
       };
 
-      const data = await safefetch((import.meta.env.VITE_API_URL || '') + '/api/v1/auth/register', {
+      const data = await safeFetch('/api/v1/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -191,7 +191,7 @@ export default function AuthPage() {
       const result = await signInWithPopup(firebaseAuth, googleProvider);
       const idToken = await result.user.getIdToken();
 
-      const data = await safefetch((import.meta.env.VITE_API_URL || '') + '/api/v1/auth/google-login', {
+      const data = await safeFetch('/api/v1/auth/google-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken, role })
