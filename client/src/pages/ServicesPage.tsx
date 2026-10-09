@@ -198,9 +198,15 @@ export default function ServicesPage() {
     });
   }, [searchQuery, filterType]);
 
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+
   const handleProceed = (serviceId: string) => {
     const svc = SERVICES.find(s => s.id === serviceId);
-    if (svc) navigate('/payment', { state: { service: svc } });
+    if (svc) setSelectedService(svc);
+  };
+
+  const handleCheckout = () => {
+    if (selectedService) navigate('/payment', { state: { service: selectedService } });
   };
 
   return (
@@ -364,6 +370,57 @@ export default function ServicesPage() {
       </div>
 
       <Footer variant="rider" />
+
+      {/* Floating Bottom Cart Tray */}
+      <AnimatePresence>
+        {selectedService && (
+          <motion.div
+            initial={{ y: "100%", opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: "100%", opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed bottom-0 left-0 right-0 z-50 p-4 pb-8 md:p-6 bg-[#121824]/95 backdrop-blur-xl border-t border-slate-800 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]"
+          >
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-orange-500/10 rounded-xl border border-orange-500/20 text-orange-400">
+                    {iconMap[selectedService.icon]}
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-bold text-white">{t(selectedService.nameKey, selectedService.name)}</h4>
+                    <p className="text-sm text-gray-400">{selectedService.eta} • {selectedService.rating} <Star className="w-3 h-3 inline text-yellow-500 fill-yellow-500" /></p>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedService(null)} className="text-gray-400 hover:text-white p-2 rounded-full bg-white/5 border border-white/10">✕</button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-[#0A0D14] p-3 rounded-xl border border-slate-800">
+                  <p className="text-xs text-gray-500">Base Price</p>
+                  <p className="text-sm font-semibold text-white">₹{selectedService.price}</p>
+                </div>
+                <div className="bg-[#0A0D14] p-3 rounded-xl border border-slate-800">
+                  <p className="text-xs text-gray-500">Platform Fee</p>
+                  <p className="text-sm font-semibold text-white">₹50</p>
+                </div>
+                <div className="bg-[#0A0D14] p-3 rounded-xl border border-slate-800">
+                  <p className="text-xs text-gray-500">GST (18%)</p>
+                  <p className="text-sm font-semibold text-white">₹{Math.round(selectedService.price * 0.18)}</p>
+                </div>
+                <div className="bg-[#0A0D14] p-3 rounded-xl border border-orange-500/30">
+                  <p className="text-xs text-orange-500">Total Payable</p>
+                  <p className="text-lg font-bold text-orange-400">₹{selectedService.price + 50 + Math.round(selectedService.price * 0.18)}</p>
+                </div>
+              </div>
+
+              <button onClick={handleCheckout} className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors text-lg">
+                Proceed to Checkout <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

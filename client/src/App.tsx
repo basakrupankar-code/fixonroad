@@ -416,6 +416,9 @@ function ScrollToTop() {
 }
 
 import { Toaster } from "react-hot-toast";
+import ProtectedRoute from "./components/ProtectedRoute";
+import TrackingPage from "./pages/TrackingPage";
+import AIAssistant from "./components/AIAssistant";
 
 export default function App() {
   return (
@@ -452,10 +455,33 @@ export default function App() {
             <Route path="/mechanic" element={<MechanicLanding />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/services" element={<ServicesPage />} />
-            <Route path="/payment" element={<PaymentPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
+            <Route 
+              path="/payment" 
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <PaymentPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/track/:orderId" 
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <TrackingPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              } 
+            />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
+          <AIAssistant />
         </BrowserRouter>
       </AuthProvider>
     </ThemeProvider>
