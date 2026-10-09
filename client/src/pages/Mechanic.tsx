@@ -24,7 +24,7 @@ export default function MechanicPortal() {
 
   const fetchJobs = async () => {
     try {
-      const data = await safeFetch('/api/v1/bookings/mechanic-jobs');
+      const data = await safefetch((import.meta.env.VITE_API_URL || '') + '/api/v1/bookings/mechanic-jobs');
       setJobs(data.jobs || []);
     } catch (err) {
       console.error('Failed to fetch jobs', err);
@@ -44,7 +44,7 @@ export default function MechanicPortal() {
     const newState = !isAvailable;
     setIsAvailable(newState);
     try {
-      await safeFetch('/api/v1/me', {
+      await safefetch((import.meta.env.VITE_API_URL || '') + '/api/v1/me', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

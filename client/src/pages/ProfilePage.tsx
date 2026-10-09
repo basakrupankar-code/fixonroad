@@ -60,7 +60,7 @@ export default function ProfilePage() {
       });
 
       if (user.role === 'mechanic') {
-        fetch('/api/v1/me/mechanic')
+        fetch((import.meta.env.VITE_API_URL || '') + '/api/v1/me/mechanic')
           .then(res => res.json())
           .then(data => {
             if (!data.error) {
@@ -85,7 +85,7 @@ export default function ProfilePage() {
       const formattedPhone = formData.phone && formData.phone.length > 0 && !formData.phone.startsWith('+') ? `+91${formData.phone}` : formData.phone;
       const payload = { ...formData, phone: formattedPhone };
       
-      const res = await fetch('/api/v1/me', {
+      const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/v1/me', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -101,7 +101,7 @@ export default function ProfilePage() {
           isOnline: mechanicData.isOnline,
           specializations: mechanicData.specializations.split(',').map(s => s.trim()).filter(Boolean)
         };
-        const resMech = await fetch('/api/v1/me/mechanic', {
+        const resMech = await fetch((import.meta.env.VITE_API_URL || '') + '/api/v1/me/mechanic', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(mechPayload)
@@ -134,7 +134,7 @@ export default function ProfilePage() {
 
     setPasswordLoading(true);
     try {
-      const res = await fetch('/api/v1/me/password', {
+      const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/v1/me/password', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -180,7 +180,7 @@ export default function ProfilePage() {
   const handleGenerate2FA = async () => {
     setTwoFactorLoading(true);
     try {
-      const res = await fetch('/api/v1/me/2fa/generate', { method: 'POST' });
+      const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/v1/me/2fa/generate', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message || 'Failed to generate 2FA');
       setTwoFactorQrCode(data.qrCodeImage);
@@ -198,7 +198,7 @@ export default function ProfilePage() {
     }
     setTwoFactorLoading(true);
     try {
-      const res = await fetch('/api/v1/me/2fa/verify', {
+      const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/v1/me/2fa/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: twoFactorCode })
@@ -219,7 +219,7 @@ export default function ProfilePage() {
   const handleDisable2FA = async () => {
     setTwoFactorLoading(true);
     try {
-      const res = await fetch('/api/v1/me/2fa/disable', { method: 'POST' });
+      const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/v1/me/2fa/disable', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message || 'Failed to disable 2FA');
       toast.success('Two-Factor Authentication disabled');
