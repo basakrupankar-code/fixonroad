@@ -27,6 +27,10 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Basic health check
+app.get('/', (req, res) => {
+  res.status(200).send('Server is running');
+});
+
 app.get('/api/v1/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });

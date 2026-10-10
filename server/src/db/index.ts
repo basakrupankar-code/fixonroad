@@ -11,6 +11,6 @@ export const connectDB = async () => {
     console.log('Connected to MongoDB database');
   } catch (error) {
     console.error('MongoDB connection error:', error);
-    process.exit(1);
+    console.log('Continuing without database connection to ensure server binds to port...');
   }
 };
