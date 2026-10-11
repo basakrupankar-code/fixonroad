@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { resolveGeofenceLocation, type GeofencedLocation } from '../lib/geofencing';
 
 interface Coords {
   lat: number;
@@ -10,6 +11,8 @@ interface LocationContextType {
   city: string;
   coords: Coords | null;
   isLocating: boolean;
+  geofence: GeofencedLocation | null;
+  isWithinServiceArea: boolean;
   fetchLocation: () => void;
   setAddress: (address: string) => void;
   setCity: (city: string) => void;
@@ -24,75 +27,77 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const saved = localStorage.getItem('user_coords');
     return saved ? JSON.parse(saved) : null;
   });
+  const [geofence, setGeofence] = useState<GeofencedLocation | null>(() => {
+    const saved = localStorage.getItem('user_geofence');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [isWithinServiceArea, setIsWithinServiceArea] = useState<boolean>(true);
   const [isLocating, setIsLocating] = useState(false);
 
   const fetchLocation = () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      // Default to primary hub if geolocation not available
+      const fallback = resolveGeofenceLocation(22.9772, 88.4312);
+      setCoords({ lat: 22.9772, lng: 88.4312 });
+      setGeofence(fallback);
+      setIsWithinServiceArea(true);
+      setAddress(fallback.address);
+      setCity(fallback.city);
+      return;
+    }
+
     setIsLocating(true);
     
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+      (pos) => {
         const { latitude, longitude } = pos.coords;
         setCoords({ lat: latitude, lng: longitude });
         localStorage.setItem('user_coords', JSON.stringify({ lat: latitude, lng: longitude }));
 
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`,
-            {
-              headers: {
-                'Accept-Language': 'en-US,en;q=0.9',
-              },
-            }
-          );
-          const data = await res.json();
-          const addr = data.address || {};
-          
-          // Pick the most granular English locality name
-          const rawTown =
-            addr.suburb ||
-            addr.village ||
-            addr.town ||
-            addr.city_district ||
-            addr.city ||
-            addr.county ||
-            'Kalyani';
-          
-          const state = addr.state || 'West Bengal';
-          const cleanCity = `${rawTown}, ${state}`;
-          const fullAddress = data.display_name || cleanCity;
+        // Resolve location instantly using high-precision Geofence Engine (No external OSM rate-limit)
+        const geofenceLoc = resolveGeofenceLocation(latitude, longitude);
+        setGeofence(geofenceLoc);
+        setIsWithinServiceArea(geofenceLoc.isWithinServiceArea);
+        setAddress(geofenceLoc.address);
+        setCity(geofenceLoc.city);
 
-          setAddress(fullAddress);
-          setCity(cleanCity);
-          localStorage.setItem('user_address', fullAddress);
-          localStorage.setItem('user_city', cleanCity);
-        } catch (err) {
-          console.error("Reverse geocoding failed:", err);
-        } finally {
-          setIsLocating(false);
-        }
+        localStorage.setItem('user_address', geofenceLoc.address);
+        localStorage.setItem('user_city', geofenceLoc.city);
+        localStorage.setItem('user_geofence', JSON.stringify(geofenceLoc));
+        setIsLocating(false);
       },
       (err) => {
-        console.warn("Geolocation denied/failed:", err);
+        console.warn("Geolocation denied/unavailable, defaulting to primary service hub:", err);
+        const fallback = resolveGeofenceLocation(22.9772, 88.4312);
+        setCoords({ lat: 22.9772, lng: 88.4312 });
+        setGeofence(fallback);
+        setIsWithinServiceArea(true);
+        if (!localStorage.getItem('user_address') || localStorage.getItem('user_address') === 'Detecting location...') {
+          setAddress(fallback.address);
+          setCity(fallback.city);
+          localStorage.setItem('user_address', fallback.address);
+          localStorage.setItem('user_city', fallback.city);
+        }
         setIsLocating(false);
       },
       {
-        enableHighAccuracy: true, // Forces hardware GPS over IP lookup
-        timeout: 15000,
-        maximumAge: 0, // Prevents using cached ISP location
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
       }
     );
   };
 
   useEffect(() => {
-    // If no address is cached, detect on mount
-    if (!localStorage.getItem('user_address')) {
+    // If no address is cached or it's placeholder, detect on mount
+    const cached = localStorage.getItem('user_address');
+    if (!cached || cached === 'Detecting location...') {
       fetchLocation();
     }
   }, []);
 
   return (
-    <LocationContext.Provider value={{ address, city, coords, fetchLocation, isLocating, setAddress, setCity }}>
+    <LocationContext.Provider value={{ address, city, coords, geofence, isWithinServiceArea, fetchLocation, isLocating, setAddress, setCity }}>
       {children}
     </LocationContext.Provider>
   );

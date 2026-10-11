@@ -8,6 +8,8 @@ const mechanicSchema = new mongoose.Schema({
   role: { type: String, default: 'mechanic' },
   workshopName: { type: String },
   serviceCategories: { type: [String], default: [] },
+  specialization: { type: String },
+  serviceRadius: { type: Number, default: 10 },
   vehiclePlate: { type: String },
   upiId: { type: String },
   isAvailable: { type: Boolean, default: false },

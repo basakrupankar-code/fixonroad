@@ -15,6 +15,10 @@ const firebaseConfig = {
 let app;
 let auth: any = {};
 const googleProvider = new GoogleAuthProvider();
+// Force account chooser so any user/mechanic can choose their own account
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 try {
   if (firebaseConfig.apiKey) {

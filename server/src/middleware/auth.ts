@@ -8,6 +8,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: {
+        _id?: any;
         userId: string;
         role: string;
       };
@@ -17,7 +18,10 @@ declare global {
 
 export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const token = req.cookies?.session_token;
+    let token = req.cookies?.session_token;
+    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
 
     if (!token) {
       return res.status(401).json({ success: false, message: 'Unauthorized. Please log in.' });
@@ -44,6 +48,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     }
 
     req.user = {
+      _id: user._id,
       userId: user._id.toString(),
       role: session.role
     };

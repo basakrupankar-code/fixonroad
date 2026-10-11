@@ -13,14 +13,16 @@ const router = Router();
 const RegisterSchema = z.object({
   email: z.string().email('Invalid email address'),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number format').optional(),
-  username: z.string().min(3, 'Username must be at least 3 characters'),
+  username: z.string().min(3, 'Username must be at least 3 characters').optional(),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  age: z.number().min(16, 'You must be at least 16 years old'),
+  age: z.number().min(16, 'You must be at least 16 years old').optional(),
   city: z.string().min(2, 'City is required'),
   acceptedCookies: z.boolean().refine(val => val === true, 'You must accept cookies'),
   role: z.enum(['customer', 'mechanic']),
   workshopName: z.string().optional(),
+  serviceRadius: z.union([z.number(), z.string().transform(v => parseFloat(v) || 10)]).optional(),
+  specialization: z.string().optional(),
   vehiclePlate: z.string().optional(),
   upiId: z.string().optional()
 });

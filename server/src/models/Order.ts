@@ -20,6 +20,14 @@ const orderSchema = new mongoose.Schema({
     enum: ['IDLE', 'PENDING', 'VERIFYING', 'PAID', 'FAILED', 'CONFIRMED', 'MECHANIC_ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'COMPLETED', 'EXPIRED'], 
     default: 'PENDING' 
   },
+  paymentMethod: {
+    type: String,
+    enum: ['cod', 'razorpay', 'upi', 'card', 'netbanking'],
+    default: 'cod'
+  },
+  razorpayOrderId: { type: String },
+  razorpayPaymentId: { type: String },
+  razorpaySignature: { type: String },
   expiresAt: { type: Date },
 }, { timestamps: true });
 

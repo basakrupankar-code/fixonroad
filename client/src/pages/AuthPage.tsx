@@ -9,6 +9,7 @@ import { auth as firebaseAuth, googleProvider } from '../lib/firebase';
 import { PasswordPolicy } from '../components/PasswordPolicy';
 import toast from 'react-hot-toast';
 import { safeFetch } from '../lib/api';
+import { resolveGeofenceLocation } from '../lib/geofencing';
 
 type Role = 'customer' | 'mechanic';
 type Mode = 'login' | 'register';
@@ -16,9 +17,15 @@ type Mode = 'login' | 'register';
 export default function AuthPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
-  const initialRole = searchParams.get('role') === 'mechanic' ? 'mechanic' : 'customer';
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
-  const [role, setRole] = useState<Role>(initialRole as Role);
+  useEffect(() => {
+    if (searchParams.get('role') === 'mechanic') {
+      navigate('/partner/auth', { replace: true });
+    }
+  }, [searchParams, navigate]);
+
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,30 +39,15 @@ export default function AuthPage() {
     phone: '',
     age: '',
     city: '',
-    acceptedCookies: false,
-    workshopName: '',
-    vehiclePlate: '',
-    upiId: ''
+    acceptedCookies: false
   });
 
   const [isLoading, setIsLoading] = useState(false);
   const [registerSuccess, setRegisterSuccess] = useState(false);
 
-  const navigate = useNavigate();
-  const { login } = useAuth();
-
   useEffect(() => {
-    document.title = role === 'customer'
-      ? 'Join FixOnRoad — Roadside Assistance'
-      : 'Mechanic Portal — FixOnRoad Partner';
-  }, [role]);
-
-  useEffect(() => {
-    const qRole = searchParams.get('role');
-    if (qRole === 'mechanic' || qRole === 'customer') {
-      setRole(qRole as Role);
-    }
-  }, [searchParams]);
+    document.title = 'Join FixOnRoad — Roadside Assistance';
+  }, []);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -81,7 +73,7 @@ export default function AuthPage() {
       if (redirectUrl) {
         navigate(redirectUrl + (serviceId ? `?serviceId=${serviceId}` : ''));
       } else {
-        navigate(data.user.role === 'mechanic' ? '/mechanic-dashboard' : '/services');
+        navigate('/services');
       }
     } catch (err: any) {
       toast.error(err.message);
@@ -105,7 +97,7 @@ export default function AuthPage() {
         ...registerData,
         phone: formattedPhone,
         age: parseInt(registerData.age, 10),
-        role
+        role: 'customer'
       };
 
       const data = await safeFetch('/api/v1/auth/register', {
@@ -131,15 +123,13 @@ export default function AuthPage() {
 
     setIsLoading(true);
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
+      (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-          const data = await res.json();
-          const city = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district;
-          if (city) {
-            setRegisterData(prev => ({ ...prev, city }));
-            toast.success('Location detected!');
+          const geofenceLoc = resolveGeofenceLocation(latitude, longitude);
+          if (geofenceLoc.city) {
+            setRegisterData(prev => ({ ...prev, city: geofenceLoc.city }));
+            toast.success(`Geofence location: ${geofenceLoc.city}`);
           } else {
             toast.error('Could not detect city automatically');
           }
@@ -150,7 +140,10 @@ export default function AuthPage() {
         }
       },
       (_err) => {
-        toast.error('Failed to get location permission');
+        // Fallback to default service hub
+        const fallback = resolveGeofenceLocation(22.9772, 88.4312);
+        setRegisterData(prev => ({ ...prev, city: fallback.city }));
+        toast(`Defaulted to primary hub: ${fallback.city}`, { icon: '📍' });
         setIsLoading(false);
       }
     );
@@ -194,7 +187,7 @@ export default function AuthPage() {
       const data = await safeFetch('/api/v1/auth/google-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken, role })
+        body: JSON.stringify({ idToken, role: 'customer' })
       });
 
       login(data.user);
@@ -205,7 +198,7 @@ export default function AuthPage() {
       if (redirectUrl) {
         navigate(redirectUrl + (serviceId ? `?serviceId=${serviceId}` : ''));
       } else {
-        navigate(data.user.role === 'mechanic' ? '/mechanic-dashboard' : '/services');
+        navigate('/services');
       }
     } catch (err: any) {
       console.error(err);
@@ -237,7 +230,7 @@ export default function AuthPage() {
       >
         <div className="w-full max-w-md bg-[#121824] border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10">
           <div className="relative z-10">
-            {/* Top Navigation & Role Selection */}
+            {/* Top Navigation & Partner Link */}
             <div className="flex items-center justify-between mb-6">
               <button 
                 type="button" 
@@ -247,28 +240,13 @@ export default function AuthPage() {
                 <ChevronLeft className="w-3 h-3" /> Back
               </button>
               
-              {!registerSuccess && (
-                <div className="bg-[#0B0F17] p-1 rounded-xl border border-slate-800 flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => { setRole('customer'); setMode('login'); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                      role === 'customer' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    Driver / Rider
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setRole('mechanic'); setMode('login'); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                      role === 'mechanic' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    Mechanic Partner
-                  </button>
-                </div>
-              )}
+              <Link
+                to="/partner/auth"
+                className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 transition-all hover:bg-emerald-500/15"
+              >
+                <span>Partner Portal</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
             </div>
 
             {/* Logo */}
@@ -476,54 +454,7 @@ export default function AuthPage() {
                     </div>
                   </div>
 
-                  {role === 'mechanic' && (
-                    <div className="space-y-4 pt-2 border-t border-white/10">
-                      <div>
-                        <label className="text-xs font-medium block mb-1 text-gray-400">Workshop Name</label>
-                        <div className="relative">
-                          <Wrench className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                          <input
-                            type="text"
-                            value={registerData.workshopName}
-                            onChange={e => setRegisterData(d => ({ ...d, workshopName: e.target.value }))}
-                            className="w-full h-10 bg-white/5 border border-white/10 rounded-xl pl-9 pr-3 text-sm text-white focus:border-orange-500/50 outline-none"
-                            placeholder="Speedy Auto Garage"
-                            required={role === 'mechanic'}
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs font-medium block mb-1 text-gray-400">Vehicle Plate</label>
-                          <div className="relative">
-                            <CarFront className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                            <input
-                              type="text"
-                              value={registerData.vehiclePlate}
-                              onChange={e => setRegisterData(d => ({ ...d, vehiclePlate: e.target.value }))}
-                              className="w-full h-10 bg-white/5 border border-white/10 rounded-xl pl-9 pr-3 text-sm text-white focus:border-orange-500/50 outline-none uppercase"
-                              placeholder="WB 02 AB 1234"
-                              required={role === 'mechanic'}
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium block mb-1 text-gray-400">UPI ID for Payouts</label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-gray-500 text-sm">₹</span>
-                            <input
-                              type="text"
-                              value={registerData.upiId}
-                              onChange={e => setRegisterData(d => ({ ...d, upiId: e.target.value }))}
-                              className="w-full h-10 bg-white/5 border border-white/10 rounded-xl pl-8 pr-3 text-sm text-white focus:border-orange-500/50 outline-none"
-                              placeholder="number@upi"
-                              required={role === 'mechanic'}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+
 
                   <div className="flex items-center mt-2">
                     <input
@@ -649,14 +580,23 @@ export default function AuthPage() {
 
             {/* Toggle Mode */}
             {!registerSuccess && (
-              <div className="mt-6 text-center">
+              <div className="mt-6 text-center space-y-3">
                 <button
                   type="button"
                   onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                  className="text-sm text-gray-400 hover:text-white transition-colors block w-full"
                 >
                   {mode === 'login' ? t('auth.noAccount', "Don't have an account? Sign up") : t('auth.alreadyAccount', "Already have an account? Log in")}
                 </button>
+
+                <div className="pt-3 border-t border-slate-800">
+                  <Link
+                    to="/partner/auth"
+                    className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold inline-flex items-center gap-1 transition-colors"
+                  >
+                    Are you a mechanic partner? Access Partner Portal →
+                  </Link>
+                </div>
               </div>
             )}
 
