@@ -71,3 +71,40 @@ export const requireRole = (role: 'customer' | 'mechanic') => {
     next();
   };
 };
+
+export const optionalAuth = async (req: Request, _res: Response, next: NextFunction) => {
+  try {
+    let token = req.cookies?.session_token;
+    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
+      return next();
+    }
+
+    const session = await Session.findOne({ sessionToken: token });
+    if (!session || session.expiresAt < new Date()) {
+      return next();
+    }
+
+    let user;
+    if (session.role === 'mechanic') {
+      user = await mongoose.model('Mechanic').findById(session.userId);
+    } else {
+      user = await User.findById(session.userId);
+    }
+
+    if (user) {
+      req.user = {
+        _id: user._id,
+        userId: user._id.toString(),
+        role: session.role
+      };
+    }
+
+    next();
+  } catch (_error) {
+    next();
+  }
+};

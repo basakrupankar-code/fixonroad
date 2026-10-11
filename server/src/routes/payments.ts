@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import crypto from 'crypto';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, optionalAuth } from '../middleware/auth';
 import { Order } from '../models/Order';
 import { User } from '../models/User';
 import { z } from 'zod';
@@ -109,8 +109,22 @@ router.post('/create-order', requireAuth, async (req, res, next) => {
       order.expiresAt = expiresAt;
       await order.save();
     } else {
+      let effectiveUserId = req.user?.userId || req.user?._id;
+      if (!effectiveUserId) {
+        let guestUser = await User.findOne({ email: 'guest@fixonroad.com' });
+        if (!guestUser) {
+          guestUser = await User.create({
+            name: 'Guest Customer',
+            email: 'guest@fixonroad.com',
+            phone: '+919999999999',
+            role: 'customer'
+          });
+        }
+        effectiveUserId = guestUser._id;
+      }
+
       order = await Order.create({
-        userId: req.user?.userId || req.user?._id,
+        userId: effectiveUserId,
         serviceDetails: {
           serviceType: parsed.serviceType,
           basePrice: basePrice,

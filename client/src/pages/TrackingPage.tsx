@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { MapPin, PhoneCall, ChevronLeft, Navigation2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { safeFetch } from '../lib/api';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -60,12 +61,13 @@ export default function TrackingPage() {
     let isMounted = true;
     const fetchStatus = async () => {
       try {
-        const res = await fetch(`/api/v1/bookings/${orderId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted) {
+        const token = localStorage.getItem('token');
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const data = await safeFetch(`/api/v1/bookings/${orderId}`, { headers });
+        if (isMounted && data) {
             setStatus(data.status ? data.status.replace('_', ' ') : 'MECHANIC ASSIGNED');
             
             // Extract location
@@ -92,11 +94,10 @@ export default function TrackingPage() {
             // rough estimate: 1 km = 3 mins in city traffic
             setEta(Math.max(5, Math.round(Number(dist) * 3)));
           }
+        } catch (err) {
+          console.error("Failed to fetch order status", err);
         }
-      } catch (err) {
-        console.error("Failed to fetch order status", err);
-      }
-    };
+      };
     
     fetchStatus();
     const interval = setInterval(() => {

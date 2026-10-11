@@ -68,13 +68,17 @@ export default function PaymentPage() {
 
     try {
       // 1. Create order on the backend (creates MongoDB order and Razorpay order in test mode)
-      const res = await fetch(`/api/v1/payments/create-order`, {
+      const token = localStorage.getItem('token');
+      const authHeaders: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        authHeaders['Authorization'] = `Bearer ${token}`;
+      }
+
+      const resData = await safeFetch('/api/v1/payments/create-order', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json', 
-          Authorization: `Bearer ${localStorage.getItem('token')}` 
-        },
-        credentials: 'include',
+        headers: authHeaders,
         body: JSON.stringify({
           serviceType: service?.id || "flat-tire",
           basePrice: basePrice,
@@ -83,12 +87,6 @@ export default function PaymentPage() {
         })
       });
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `Server responded with ${res.status}`);
-      }
-
-      const resData = await res.json();
       const orderData = resData.data || resData;
       const targetOrderId = orderData.orderId || orderData._id || '6ac8e7e0a6f24ff6530cc8a0';
       setConfirmedOrderId(targetOrderId);
@@ -131,13 +129,17 @@ export default function PaymentPage() {
           try {
             setIsProcessing(true);
             // Verify HMAC signature on backend
-            const verifyRes = await fetch(`/api/v1/payments/verify-payment`, {
+            const token = localStorage.getItem('token');
+            const authHeaders: Record<string, string> = {
+              'Content-Type': 'application/json'
+            };
+            if (token) {
+              authHeaders['Authorization'] = `Bearer ${token}`;
+            }
+
+            const verifyData = await safeFetch('/api/v1/payments/verify-payment', {
               method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json', 
-                Authorization: `Bearer ${localStorage.getItem('token')}` 
-              },
-              credentials: 'include',
+              headers: authHeaders,
               body: JSON.stringify({
                 orderId: targetOrderId,
                 razorpay_order_id: response.razorpay_order_id,
@@ -146,8 +148,7 @@ export default function PaymentPage() {
               })
             });
 
-            const verifyData = await verifyRes.json();
-            if (verifyRes.ok && verifyData.success) {
+            if (verifyData.success || verifyData.status === 'PAID') {
               setConfirmedPaymentId(response.razorpay_payment_id);
               setPaymentDone(true);
             } else {
