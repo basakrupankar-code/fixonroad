@@ -52,10 +52,10 @@ npm run dev
 - `PORT`: 5000
 - `MONGO_URI`: Your MongoDB connection string
 - `JWT_SECRET`: Secret for signing tokens
-- `CLIENT_ORIGIN`: Allowed origin for CORS (e.g., http://localhost:5173)
+- `CLIENT_ORIGIN`: Allowed origin for CORS 
 
 **Client (`client/.env`)**
-- `VITE_API_URL`: Backend URL (e.g., http://localhost:5000/api/v1)
+- `VITE_API_URL`: Backend URL 
 
 ## Deployment
 The project is configured for Render using `render.yaml`.
