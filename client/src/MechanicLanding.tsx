@@ -118,7 +118,7 @@ export default function MechanicLanding() {
           </motion.p>
 
           <motion.div variants={fadeUp} className="flex flex-wrap gap-4">
-            <Link to="/auth" className="btn-emerald flex items-center gap-2 group text-[15px]">
+            <Link to="/partner/auth?mode=register" className="btn-emerald flex items-center gap-2 group text-[15px]">
               {t('mechanic.hero.startEarning', 'Start Earning Today')}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
@@ -402,7 +402,7 @@ export default function MechanicLanding() {
           <p className="text-base sm:text-lg mb-10 max-w-lg mx-auto" style={{ color: 'var(--text-secondary)' }}>
             {t('mechanic.cta.desc', 'Join 500+ mechanics already earning with FixOnRoad. Registration is free and takes 2 minutes.')}
           </p>
-          <Link to="/auth" className="inline-flex items-center gap-2 btn-emerald px-10 py-5 text-lg group">
+          <Link to="/partner/auth?mode=register" className="inline-flex items-center gap-2 btn-emerald px-10 py-5 text-lg group">
             {t('mechanic.cta.button', "Join as Partner — It's Free")}
             <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
           </Link>

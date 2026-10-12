@@ -21,10 +21,10 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
   }
 
   if (!user) {
-    // Redirect them to the /auth page, but save the current location they were
-    // trying to go to when they were redirected. This allows us to send them
-    // along to that page after they login, which is a nicer user experience
-    // than dropping them off on the home page.
+    // If the route only allows mechanics, redirect directly to partner auth
+    if (allowedRoles && allowedRoles.includes('mechanic') && !allowedRoles.includes('customer')) {
+      return <Navigate to="/partner/auth" state={{ from: location }} replace />;
+    }
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 

@@ -38,7 +38,7 @@ export default function PartnerAuth() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
 
   const [mode, setMode] = useState(searchParams.get('mode') === 'register' ? 'register' : 'login');
   const [email, setEmail] = useState('');
@@ -66,7 +66,10 @@ export default function PartnerAuth() {
 
   useEffect(() => {
     document.title = 'Partner Portal — FixOnRoad Partner Network';
-  }, []);
+    if (user?.role === 'mechanic') {
+      navigate('/mechanic-dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -87,8 +90,8 @@ export default function PartnerAuth() {
       login(data.user);
       toast.success(t('auth.loginSuccess', 'Welcome to Partner Dashboard!'));
       
-      // Always navigate exclusively to /mechanic for partner auth
-      navigate('/mechanic');
+      // Navigate to partner dashboard
+      navigate('/mechanic-dashboard');
     } catch (err) {
       toast.error(err.message || 'Login failed. Please verify credentials.');
     } finally {
@@ -150,7 +153,7 @@ export default function PartnerAuth() {
       if (data.user) {
         login(data.user);
         toast.success('Partner registration successful! Welcome aboard.');
-        navigate('/mechanic');
+        navigate('/mechanic-dashboard');
       } else {
         setRegisterSuccess(true);
         toast.success(data.message || 'Partner registration complete! Please log in.');
@@ -238,8 +241,8 @@ export default function PartnerAuth() {
 
       login(data.user);
       toast.success('Signed in with Google as Mechanic Partner!');
-      // Navigate exclusively to partner dashboard
-      navigate('/mechanic');
+      // Navigate to partner dashboard
+      navigate('/mechanic-dashboard');
     } catch (err) {
       console.error(err);
       toast.error(err.message || 'Google sign in failed.');

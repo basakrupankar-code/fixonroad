@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import {
-  BrowserRouter, Routes, Route, Link, useLocation, useNavigate,
+  BrowserRouter, Routes, Route, Link, useLocation, useNavigate, Navigate,
 } from "react-router-dom";
 import {
   motion, useScroll, useTransform,
@@ -13,11 +13,13 @@ import {
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from './context/AuthContext';
 import { LocationProvider, useLocationContext } from './context/LocationContext';
+import { CartProvider } from './context/CartContext';
 import { useTranslation } from 'react-i18next';
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import MechanicLanding from "./MechanicLanding";
 import AuthPage from "./pages/AuthPage";
+import PartnerAuth from "./pages/PartnerAuth";
 import ServicesPage from "./pages/ServicesPage";
 import PaymentPage from "./pages/PaymentPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -436,6 +438,7 @@ export default function App() {
     <ThemeProvider>
       <LocationProvider>
         <AuthProvider>
+          <CartProvider>
           <BrowserRouter>
             <ScrollToTop />
             <Toaster 
@@ -506,7 +509,8 @@ export default function App() {
                   </ProtectedRoute>
                 } 
               />
-              <Route path="*" element={<NotFoundPage />} />
+              <Route path="/partner/auth" element={<PartnerAuth />} />
+              <Route path="/partner" element={<Navigate to="/partner/auth" replace />} />
               <Route 
                 path="/mechanic-dashboard" 
                 element={
@@ -515,9 +519,35 @@ export default function App() {
                   </ProtectedRoute>
                 } 
               />
+              <Route 
+                path="/partner-portal" 
+                element={
+                  <ProtectedRoute allowedRoles={['mechanic']}>
+                    <MechanicPortal />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/partner/portal" 
+                element={
+                  <ProtectedRoute allowedRoles={['mechanic']}>
+                    <MechanicPortal />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/mechanic-portal" 
+                element={
+                  <ProtectedRoute allowedRoles={['mechanic']}>
+                    <MechanicPortal />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
             <AIAssistant />
           </BrowserRouter>
+          </CartProvider>
         </AuthProvider>
       </LocationProvider>
     </ThemeProvider>

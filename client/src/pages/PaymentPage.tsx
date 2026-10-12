@@ -7,6 +7,7 @@ import Navbar from '../components/Navbar';
 import { safeFetch } from '../lib/api';
 import { useLocationContext } from '../context/LocationContext';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 
 type PaymentMethod = 'cod' | 'upi' | 'card' | 'netbanking';
 
@@ -37,6 +38,7 @@ export default function PaymentPage() {
   const locationState = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { clearCart } = useCart();
   const service = locationState.state?.service || { id: 'flat-tire', name: 'Flat Tire / Puncture Repair', nameKey: 'services.items.flatTire', price: 150, gst: 27 };
 
   const [method, setMethod] = useState<PaymentMethod>('upi');
@@ -93,6 +95,7 @@ export default function PaymentPage() {
 
       // 2. If Cash on Delivery, redirect straight to tracking
       if (method === 'cod') {
+        clearCart();
         navigate(`/track/${targetOrderId}`);
         return;
       }
@@ -150,6 +153,7 @@ export default function PaymentPage() {
 
             if (verifyData.success || verifyData.status === 'PAID') {
               setConfirmedPaymentId(response.razorpay_payment_id);
+              clearCart();
               setPaymentDone(true);
             } else {
               setError(verifyData.message || 'Payment signature verification failed.');

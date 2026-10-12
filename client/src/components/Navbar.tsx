@@ -6,6 +6,7 @@ import { Wrench, Menu, X, Globe, MapPin, RefreshCw, ShoppingCart } from 'lucide-
 import { useTheme } from './ThemeProvider';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
+import { useCart } from '../context/CartContext';
 
 // Helper for hash links across pages
 const HashLink = ({ to, children, className, onClick }: any) => {
@@ -36,6 +37,7 @@ const HashLink = ({ to, children, className, onClick }: any) => {
 export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mechanic' }) {
   const { theme } = useTheme();
   const { user, isAuthenticated, logout } = useAuth();
+  const { itemCount } = useCart();
   const { t, i18n } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -174,9 +176,14 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                 <Link 
                   to="/cart"
                   className="relative p-2 rounded-xl hover:bg-white/5 transition-colors text-gray-300 hover:text-white inline-block"
+                  aria-label="View Cart"
                 >
                   <ShoppingCart className="w-5 h-5" />
-                  <span className="absolute top-1 right-1 w-4 h-4 bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border border-[#0B0F17]">1</span>
+                  {itemCount > 0 && (
+                    <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border border-[#0B0F17]">
+                      {itemCount}
+                    </span>
+                  )}
                 </Link>
               </div>
             )}
@@ -196,7 +203,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
               </div>
             ) : (
               <Link
-                to="/auth"
+                to={isMechanic ? '/partner/auth' : '/auth'}
                 className={`hidden md:inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
                   isMechanic ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/20' : 'btn-primary'
                 }`}
@@ -258,6 +265,24 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   </Link>
                 )
               )}
+              {isAuthenticated && user?.role === 'customer' && (
+                <Link
+                  to="/cart"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center justify-between text-lg font-medium transition-colors hover:text-white"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <ShoppingCart className="w-5 h-5 text-orange-400" />
+                    <span>{t('nav.cart', 'Cart')}</span>
+                  </span>
+                  {itemCount > 0 && (
+                    <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-orange-500 text-white">
+                      {itemCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               {isAuthenticated && user ? (
                 <div className="mt-4 text-center">
                   <div className="mb-2">
@@ -274,7 +299,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                 </div>
               ) : (
                 <Link
-                  to="/auth"
+                  to={isMechanic ? '/partner/auth' : '/auth'}
                   className={`mt-4 text-center px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isMechanic ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/20' : 'btn-primary'}`}
                 >
                   <span className="relative z-10">{isMechanic ? t('nav.partnerLogin', 'Partner Login') : t('nav.signIn', 'Sign In')}</span>

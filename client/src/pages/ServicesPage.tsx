@@ -2,10 +2,12 @@ import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, Star, Clock, ChevronRight, Zap, Droplets, Battery, Link2, Cog, AlertTriangle, PackageOpen, Wrench, Key, Truck, CarFront, Bike } from 'lucide-react';
+import { Search, Star, Clock, ChevronRight, Zap, Droplets, Battery, Link2, Cog, AlertTriangle, PackageOpen, Wrench, Key, Truck, CarFront, Bike, ShoppingCart, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 
 /* ===== Service Data ===== */
 type VehicleType = 'bike' | 'car';
@@ -212,6 +214,7 @@ export default function ServicesPage() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
 
   const { user, isAuthenticated } = useAuth();
+  const { addItem, removeItem, isInCart } = useCart();
 
   const handleProceed = (serviceId: string) => {
     if (!isAuthenticated) {
@@ -219,11 +222,37 @@ export default function ServicesPage() {
       return;
     }
     const svc = SERVICES.find(s => s.id === serviceId);
-    if (svc) setSelectedService(svc);
+    if (svc) {
+      setSelectedService(svc);
+      if (!isInCart(svc.id)) {
+        addItem({
+          id: svc.id,
+          name: svc.name,
+          nameKey: svc.nameKey,
+          type: svc.type,
+          icon: svc.icon,
+          price: svc.price,
+          eta: svc.eta,
+          quantity: 1,
+        });
+      }
+    }
   };
 
   const handleCheckout = () => {
     if (!selectedService) return;
+    if (!isInCart(selectedService.id)) {
+      addItem({
+        id: selectedService.id,
+        name: selectedService.name,
+        nameKey: selectedService.nameKey,
+        type: selectedService.type,
+        icon: selectedService.icon,
+        price: selectedService.price,
+        eta: selectedService.eta,
+        quantity: 1,
+      });
+    }
     if (!user) {
       navigate('/auth', { state: { from: { pathname: '/services' }, service: selectedService } });
       return;
@@ -377,12 +406,42 @@ export default function ServicesPage() {
                         <p className="text-lg font-bold text-orange-400">₹{total}</p>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => handleProceed(service.id)}
-                      className="w-full h-11 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
-                    >
-                      {t('common.buttons.bookNow', 'Book Now')} <ChevronRight className="w-4 h-4" />
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleProceed(service.id)}
+                        className="flex-1 h-11 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                      >
+                        {t('common.buttons.bookNow', 'Book Now')} <ChevronRight className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (isInCart(service.id)) {
+                            removeItem(service.id);
+                            toast.success(t('cart.removedToast', `Removed ${service.name} from cart`));
+                          } else {
+                            addItem({
+                              id: service.id,
+                              name: service.name,
+                              nameKey: service.nameKey,
+                              type: service.type,
+                              icon: service.icon,
+                              price: service.price,
+                              eta: service.eta,
+                              quantity: 1,
+                            });
+                            toast.success(t('cart.addedToast', `Added ${service.name} to cart`));
+                          }
+                        }}
+                        title={isInCart(service.id) ? "Remove from cart" : "Add to cart"}
+                        className={`h-11 px-3.5 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
+                          isInCart(service.id)
+                            ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30'
+                            : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 hover:text-white'
+                        }`}
+                      >
+                        {isInCart(service.id) ? <Trash2 className="w-4 h-4 text-red-400" /> : <ShoppingCart className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               );
@@ -436,9 +495,50 @@ export default function ServicesPage() {
                 </div>
               </div>
 
-              <button onClick={handleCheckout} className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors text-lg">
-                Proceed to Checkout <ChevronRight className="w-5 h-5" />
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => {
+                    if (isInCart(selectedService.id)) {
+                      removeItem(selectedService.id);
+                      toast.success(t('cart.removedToast', `Removed ${selectedService.name} from cart`));
+                    } else {
+                      addItem({
+                        id: selectedService.id,
+                        name: selectedService.name,
+                        nameKey: selectedService.nameKey,
+                        type: selectedService.type,
+                        icon: selectedService.icon,
+                        price: selectedService.price,
+                        eta: selectedService.eta,
+                        quantity: 1,
+                      });
+                      toast.success(t('cart.addedToast', `Added ${selectedService.name} to cart`));
+                    }
+                  }}
+                  className={`py-4 px-6 font-bold rounded-xl flex items-center justify-center gap-2 transition-all border cursor-pointer ${
+                    isInCart(selectedService.id)
+                      ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30'
+                      : 'bg-white/5 hover:bg-white/10 text-white border-white/10'
+                  }`}
+                >
+                  {isInCart(selectedService.id) ? (
+                    <>
+                      <Trash2 className="w-4 h-4" /> Remove from Cart
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="w-4 h-4" /> Add to Cart
+                    </>
+                  )}
+                </button>
+
+                <button 
+                  onClick={handleCheckout} 
+                  className="flex-1 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors text-lg cursor-pointer shadow-lg shadow-orange-500/20"
+                >
+                  Proceed to Checkout <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
