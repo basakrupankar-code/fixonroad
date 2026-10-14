@@ -4,7 +4,7 @@ const mechanicSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String },
-  phone: { type: String },
+  phone: { type: String, unique: true, sparse: true },
   role: { type: String, default: 'mechanic' },
   workshopName: { type: String },
   serviceCategories: { type: [String], default: [] },

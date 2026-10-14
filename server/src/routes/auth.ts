@@ -203,16 +203,24 @@ router.post('/google-login', async (req, res, next) => {
     const effectiveRole = role === 'mechanic' ? 'mechanic' : 'customer';
     const Model: any = effectiveRole === 'mechanic' ? Mechanic : User;
 
-    let user: any = await Model.findOne({ email: normalizedEmail });
+    let user: any = await Model.findOne({
+      email: { $regex: new RegExp(`^${normalizedEmail}$`, 'i') }
+    });
 
     if (!user) {
       try {
         if (effectiveRole === 'mechanic') {
+          // If the user previously registered as a customer, reuse their name
+          const existingCustomer = await User.findOne({
+            email: { $regex: new RegExp(`^${normalizedEmail}$`, 'i') }
+          });
+          const mechanicName = decodedName || existingCustomer?.name || 'Mechanic Partner';
+
           user = await Mechanic.create({
             email: normalizedEmail,
-            name: decodedName || 'Mechanic Partner',
+            name: mechanicName,
             role: 'mechanic',
-            workshopName: `${decodedName || 'Partner'}'s Auto Garage`,
+            workshopName: `${mechanicName}'s Auto Garage`,
             serviceCategories: ['General Service', 'Flat Tyre', 'Battery Jumpstart'],
             specialization: 'Multi-Brand Specialist',
             serviceRadius: 10,
@@ -227,10 +235,12 @@ router.post('/google-login', async (req, res, next) => {
           });
         }
       } catch (createErr: any) {
-        // Prevent race condition if two concurrent requests create the account at the same time
-        if (createErr.code === 11000) {
-          user = await Model.findOne({ email: normalizedEmail });
-        } else {
+        console.warn('Google account creation caught error, checking existing:', createErr.message);
+        user = await Model.findOne({
+          email: { $regex: new RegExp(`^${normalizedEmail}$`, 'i') }
+        });
+        if (!user) {
+          console.error('Account creation failed and user not found:', createErr);
           throw createErr;
         }
       }
