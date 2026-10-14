@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Wrench, ArrowRight, ChevronLeft, CarFront, Mail, User as UserIcon, MapPin, Calendar, Eye, EyeOff, Wand2, Phone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,7 @@ type Mode = 'login' | 'register';
 export default function AuthPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -67,7 +68,7 @@ export default function AuthPage() {
 
       login(data.user);
       
-      const redirectUrl = searchParams.get('redirect');
+      const redirectUrl = searchParams.get('redirect') || (location.state as any)?.from?.pathname;
       const serviceId = searchParams.get('serviceId');
       
       if (redirectUrl) {
@@ -192,7 +193,7 @@ export default function AuthPage() {
 
       login(data.user);
       
-      const redirectUrl = searchParams.get('redirect');
+      const redirectUrl = searchParams.get('redirect') || (location.state as any)?.from?.pathname;
       const serviceId = searchParams.get('serviceId');
       
       if (redirectUrl) {

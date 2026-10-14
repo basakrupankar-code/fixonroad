@@ -3,9 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { 
-  Package, Clock, CheckCircle2, AlertCircle, ChevronRight, 
+  Package, Clock, CheckCircle2, AlertCircle, 
   MapPin, Wrench, Bike, Navigation, ArrowRight, ShieldCheck, 
-  Search, RefreshCw, PhoneCall, ExternalLink, Filter
+  Search, RefreshCw, PhoneCall, ExternalLink, LogIn, KeyRound
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { safeFetch } from '../lib/api';
@@ -25,9 +25,15 @@ interface MechanicDetails {
 interface OrderItem {
   _id: string;
   orderCode?: string;
-  serviceType: string;
-  status: string;
-  amount: number;
+  serviceType?: string;
+  serviceId?: string;
+  serviceDetails?: {
+    serviceType?: string;
+    totalAmount?: number;
+  };
+  status?: string;
+  amount?: number;
+  totalAmount?: number;
   totalPrice?: number;
   paymentMethod?: string;
   location?: {
@@ -39,24 +45,27 @@ interface OrderItem {
   roadDistanceKm?: number;
   estimatedDurationMin?: number;
   mechanicId?: MechanicDetails | null;
-  createdAt: string;
+  createdAt?: string;
 }
 
 type TabType = 'all' | 'active' | 'completed' | 'cancelled';
 
 export default function OrdersPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [quickTrackCode, setQuickTrackCode] = useState<string>('');
 
   const fetchOrders = async () => {
     try {
       setRefreshing(true);
+      setFetchError(null);
       const token = localStorage.getItem('token');
       const headers: Record<string, string> = {};
       if (token) {
@@ -66,8 +75,9 @@ export default function OrdersPage() {
       const res = await safeFetch('/api/v1/bookings', { headers });
       const rawList = res?.orders || res?.bookings || (Array.isArray(res) ? res : []);
       setOrders(rawList);
-    } catch (err) {
-      console.error("Failed to fetch customer bookings:", err);
+    } catch (err: any) {
+      console.warn("Failed to fetch customer bookings:", err.message);
+      setFetchError(err.message || "Failed to load orders");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -75,11 +85,25 @@ export default function OrdersPage() {
   };
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    if (!authLoading) {
+      if (isAuthenticated) {
+        fetchOrders();
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [isAuthenticated, authLoading]);
 
-  const getStatusBadge = (status: string) => {
-    const s = (status || '').toUpperCase();
+  const handleQuickTrack = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = quickTrackCode.trim();
+    if (clean) {
+      navigate(`/track/${clean.toUpperCase()}`);
+    }
+  };
+
+  const getStatusBadge = (rawStatus?: string) => {
+    const s = (rawStatus || '').toUpperCase();
     switch (s) {
       case 'PENDING':
         return (
@@ -90,6 +114,7 @@ export default function OrdersPage() {
         );
       case 'CONFIRMED':
       case 'ASSIGNED':
+      case 'MECHANIC_ASSIGNED':
       case 'EN_ROUTE':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-500/15 text-orange-400 border border-orange-500/30">
@@ -98,6 +123,7 @@ export default function OrdersPage() {
           </span>
         );
       case 'IN_PROGRESS':
+      case 'ARRIVED':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
@@ -113,34 +139,36 @@ export default function OrdersPage() {
           </span>
         );
       case 'CANCELLED':
+      case 'EXPIRED':
+      case 'FAILED':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-500/15 text-red-400 border border-red-500/30">
             <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-            Cancelled
+            {s === 'EXPIRED' ? 'Expired' : 'Cancelled'}
           </span>
         );
       default:
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">
-            {status}
+            {rawStatus || 'Confirmed'}
           </span>
         );
     }
   };
 
-  const isActiveOrder = (status: string) => {
-    const s = (status || '').toUpperCase();
-    return ['PENDING', 'CONFIRMED', 'ASSIGNED', 'EN_ROUTE', 'IN_PROGRESS'].includes(s);
+  const isActiveOrder = (rawStatus?: string) => {
+    const s = (rawStatus || '').toUpperCase();
+    return ['PENDING', 'CONFIRMED', 'ASSIGNED', 'MECHANIC_ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(s);
   };
 
-  const isCompletedOrder = (status: string) => {
-    const s = (status || '').toUpperCase();
+  const isCompletedOrder = (rawStatus?: string) => {
+    const s = (rawStatus || '').toUpperCase();
     return ['COMPLETED', 'PAID'].includes(s);
   };
 
-  const isCancelledOrder = (status: string) => {
-    const s = (status || '').toUpperCase();
-    return s === 'CANCELLED';
+  const isCancelledOrder = (rawStatus?: string) => {
+    const s = (rawStatus || '').toUpperCase();
+    return ['CANCELLED', 'EXPIRED', 'FAILED'].includes(s);
   };
 
   const filteredOrders = orders.filter((order) => {
@@ -152,8 +180,8 @@ export default function OrdersPage() {
     // Search query filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const code = (order.orderCode || order._id).toLowerCase();
-      const service = (order.serviceType || '').toLowerCase();
+      const code = (order.orderCode || order._id || '').toLowerCase();
+      const service = (order.serviceType || order.serviceId || order.serviceDetails?.serviceType || '').toLowerCase();
       const mechName = (order.mechanicId?.name || '').toLowerCase();
       const addr = (order.location?.address || order.address || '').toLowerCase();
       return code.includes(q) || service.includes(q) || mechName.includes(q) || addr.includes(q);
@@ -181,21 +209,23 @@ export default function OrdersPage() {
               <div>
                 <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">My Bookings & Orders</h1>
                 <p className="text-slate-400 text-sm mt-0.5">
-                  Track active dispatches, view order history, and monitor mechanic routes.
+                  Track active mechanic dispatches, review service history, and monitor real road routes.
                 </p>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={fetchOrders}
-              disabled={refreshing}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-sm font-semibold transition-all shadow-sm disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 text-orange-400 ${refreshing ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
-            </button>
+            {isAuthenticated && (
+              <button
+                onClick={fetchOrders}
+                disabled={refreshing}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-sm font-semibold transition-all shadow-sm disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 text-orange-400 ${refreshing ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            )}
             <Link
               to="/services"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-sm font-bold shadow-lg shadow-orange-500/20 transition-all"
@@ -206,77 +236,135 @@ export default function OrdersPage() {
           </div>
         </div>
 
-        {/* Filter Tabs & Search Bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-8">
-          {/* Tabs */}
-          <div className="flex items-center gap-2 bg-[#121824] p-1.5 rounded-2xl border border-slate-800 overflow-x-auto">
+        {/* Quick Order Tracker Lookup Card */}
+        <div className="bg-[#121824] rounded-2xl border border-slate-800 p-5 mb-8 shadow-md">
+          <form onSubmit={handleQuickTrack} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="flex items-center gap-2 text-slate-300 text-sm font-semibold shrink-0">
+              <KeyRound className="w-4 h-4 text-orange-400" />
+              <span>Quick Live Tracker:</span>
+            </div>
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Enter Order Code (e.g. FOR-685370) or Order ID..."
+                value={quickTrackCode}
+                onChange={(e) => setQuickTrackCode(e.target.value)}
+                className="w-full bg-[#0B0F17] border border-slate-700/80 rounded-xl px-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+              />
+            </div>
             <button
-              onClick={() => setActiveTab('all')}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
-                activeTab === 'all'
-                  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/25'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-              }`}
+              type="submit"
+              disabled={!quickTrackCode.trim()}
+              className="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white font-bold text-sm transition-all shrink-0 flex items-center justify-center gap-2"
             >
-              All Orders ({orders.length})
+              <span>Track Now</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
-            <button
-              onClick={() => setActiveTab('active')}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === 'active'
-                  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/25'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-              }`}
-            >
-              Active Dispatches
-              {activeCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white text-orange-600 font-extrabold">
-                  {activeCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('completed')}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
-                activeTab === 'completed'
-                  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/25'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-              }`}
-            >
-              Completed ({completedCount})
-            </button>
-            <button
-              onClick={() => setActiveTab('cancelled')}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
-                activeTab === 'cancelled'
-                  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/25'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-              }`}
-            >
-              Cancelled ({cancelledCount})
-            </button>
-          </div>
-
-          {/* Search Box */}
-          <div className="relative sm:w-64">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by code, mechanic, place..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#121824] border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500/50"
-            />
-          </div>
+          </form>
         </div>
 
+        {/* Not Signed In Banner */}
+        {!authLoading && !isAuthenticated && (
+          <div className="bg-[#121824] rounded-3xl border border-orange-500/30 p-8 sm:p-10 text-center max-w-lg mx-auto mb-8 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 to-amber-500" />
+            <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mx-auto mb-4 text-orange-400">
+              <LogIn className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Sign in to view all your bookings</h3>
+            <p className="text-slate-400 text-sm mb-6">
+              You are currently browsing as a guest. Sign in to synchronize and view your complete roadside assistance history.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                to="/auth?redirect=/orders"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-sm shadow-lg shadow-orange-500/25 transition-all"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Sign In to Account</span>
+              </Link>
+              <Link
+                to="/services"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm border border-slate-700 transition-all"
+              >
+                <span>Request Service</span>
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Filter Tabs & Search Bar (when authenticated) */}
+        {isAuthenticated && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-8">
+            {/* Tabs */}
+            <div className="flex items-center gap-2 bg-[#121824] p-1.5 rounded-2xl border border-slate-800 overflow-x-auto">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                  activeTab === 'all'
+                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/25'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                }`}
+              >
+                All Orders ({orders.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('active')}
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  activeTab === 'active'
+                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/25'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                }`}
+              >
+                Active Dispatches
+                {activeCount > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white text-orange-600 font-extrabold">
+                    {activeCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('completed')}
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                  activeTab === 'completed'
+                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/25'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                }`}
+              >
+                Completed ({completedCount})
+              </button>
+              <button
+                onClick={() => setActiveTab('cancelled')}
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                  activeTab === 'cancelled'
+                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/25'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                }`}
+              >
+                Cancelled ({cancelledCount})
+              </button>
+            </div>
+
+            {/* Search Box */}
+            <div className="relative sm:w-64">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search by code, mechanic..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#121824] border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500/50"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Orders List / Grid */}
-        {loading ? (
+        {loading || authLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500 mb-4" />
             <p className="text-slate-400 text-sm">Loading your bookings...</p>
           </div>
-        ) : filteredOrders.length === 0 ? (
+        ) : isAuthenticated && filteredOrders.length === 0 ? (
           <div className="bg-[#121824] rounded-3xl border border-slate-800 p-12 text-center max-w-lg mx-auto">
             <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto mb-4 text-slate-500">
               <Package className="w-8 h-8" />
@@ -304,13 +392,33 @@ export default function OrdersPage() {
               {filteredOrders.map((order) => {
                 const isLive = isActiveOrder(order.status);
                 const trackingKey = order.orderCode || order._id;
-                const formattedDate = new Date(order.createdAt).toLocaleDateString('en-IN', {
+                const formattedDate = order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN', {
                   day: 'numeric',
                   month: 'short',
                   year: 'numeric',
                   hour: '2-digit',
                   minute: '2-digit'
-                });
+                }) : 'Recent';
+
+                const serviceName = (
+                  order.serviceType || 
+                  order.serviceId || 
+                  order.serviceDetails?.serviceType || 
+                  'Roadside Assistance'
+                ).replace(/-/g, ' ');
+
+                const orderPrice = 
+                  order.amount || 
+                  order.totalPrice || 
+                  order.totalAmount || 
+                  order.serviceDetails?.totalAmount || 
+                  150;
+
+                const orderLocation = 
+                  order.location?.address || 
+                  order.address || 
+                  'Your breakdown location';
+
                 const mech = order.mechanicId;
 
                 return (
@@ -343,7 +451,7 @@ export default function OrdersPage() {
                         <div className="flex items-center gap-3">
                           {getStatusBadge(order.status)}
                           <div className="text-right">
-                            <span className="text-lg font-black text-white">₹{order.amount || order.totalPrice || 150}</span>
+                            <span className="text-lg font-black text-white">₹{orderPrice}</span>
                           </div>
                         </div>
                       </div>
@@ -355,7 +463,7 @@ export default function OrdersPage() {
                           <div>
                             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Service Required</span>
                             <div className="text-sm font-bold text-white capitalize mt-0.5">
-                              {order.serviceType.replace(/-/g, ' ')}
+                              {serviceName}
                             </div>
                           </div>
 
@@ -364,7 +472,7 @@ export default function OrdersPage() {
                               <MapPin className="w-3 h-3 text-emerald-400" /> Location
                             </span>
                             <p className="text-xs text-slate-300 mt-0.5 line-clamp-2">
-                              {order.location?.address || order.address || 'Your breakdown location'}
+                              {orderLocation}
                             </p>
                           </div>
                         </div>
@@ -423,7 +531,7 @@ export default function OrdersPage() {
                             {order.estimatedDurationMin ? (
                               <div>
                                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                                  <Bike className="w-3 h-3 text-orange-400" /> Bike ETA
+                                  <Bike className="w-3.5 h-3.5 text-orange-400" /> Bike ETA
                                 </span>
                                 <div className="text-sm font-bold text-orange-400 mt-0.5">
                                   {order.estimatedDurationMin} min

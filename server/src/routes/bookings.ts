@@ -276,7 +276,16 @@ const VALID_ORDER_STATUSES = [
 router.get('/', requireAuth, async (req: any, res: any, next) => {
   try {
     const { status } = req.query;
-    let query: any = { userId: req.user._id };
+    let query: any = {};
+
+    if (req.user?.role === 'mechanic') {
+      const mechId = req.user._id;
+      const mechObjId = mongoose.Types.ObjectId.isValid(mechId) ? new mongoose.Types.ObjectId(mechId) : mechId;
+      query = { $or: [{ mechanicId: mechObjId }, { mechanicId: req.user.userId }, { mechanicId: mechId }] };
+    } else {
+      const userObjId = mongoose.Types.ObjectId.isValid(req.user._id) ? new mongoose.Types.ObjectId(req.user._id) : req.user._id;
+      query = { $or: [{ userId: userObjId }, { userId: req.user.userId }, { userId: req.user._id }] };
+    }
     
     // Sanitize query to prevent NoSQL operator injection
     if (typeof status === 'string' && VALID_ORDER_STATUSES.includes(status as any)) {
@@ -287,7 +296,46 @@ router.get('/', requireAuth, async (req: any, res: any, next) => {
       .populate('mechanicId', 'name workshopName specialization serviceCategories vehiclePlate phone rating currentLocation')
       .sort({ createdAt: -1 });
 
-    res.json({ bookings: orders, orders });
+    const normalizedOrders = orders.map((o: any) => {
+      const serviceType = 
+        o.serviceType || 
+        o.serviceDetails?.serviceType || 
+        o.serviceId || 
+        'roadside-assistance';
+      
+      const amount = 
+        o.amount || 
+        o.totalAmount || 
+        o.serviceDetails?.totalAmount || 
+        o.serviceFee || 
+        150;
+
+      const location = o.location || {
+        address: o.address || 'Kalyani, West Bengal',
+        lat: 22.9772,
+        lng: 88.4312
+      };
+
+      return {
+        _id: o._id,
+        orderCode: o.orderCode || `FOR-${o._id.toString().slice(0, 6).toUpperCase()}`,
+        serviceType,
+        status: o.status || 'CONFIRMED',
+        amount,
+        totalPrice: amount,
+        paymentMethod: o.paymentMethod || 'cod',
+        location,
+        address: location.address,
+        roadDistanceKm: o.roadDistanceKm,
+        estimatedDurationMin: o.estimatedDurationMin,
+        routePolyline: o.routePolyline || [],
+        routingEngine: o.routingEngine || 'osrm-bike',
+        mechanicId: o.mechanicId,
+        createdAt: o.createdAt || new Date()
+      };
+    });
+
+    res.json({ bookings: normalizedOrders, orders: normalizedOrders });
   } catch (error) {
     next(error);
   }

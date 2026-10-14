@@ -23,14 +23,15 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
   if (!user) {
     // If the route only allows mechanics, redirect directly to partner auth
     if (allowedRoles && allowedRoles.includes('mechanic') && !allowedRoles.includes('customer')) {
-      return <Navigate to="/partner/auth" state={{ from: location }} replace />;
+      return <Navigate to={`/partner/auth?redirect=${encodeURIComponent(location.pathname)}`} state={{ from: location }} replace />;
     }
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+    return <Navigate to={`/auth?redirect=${encodeURIComponent(location.pathname)}`} state={{ from: location }} replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role as any)) {
+  const effectiveRole = user.role || 'customer';
+  if (allowedRoles && !allowedRoles.includes(effectiveRole as any)) {
     // role not authorized so redirect
-    if (user.role === 'mechanic') {
+    if (effectiveRole === 'mechanic') {
       return <Navigate to="/mechanic-dashboard" replace />;
     }
     return <Navigate to="/" replace />;

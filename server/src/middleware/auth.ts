@@ -50,7 +50,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     req.user = {
       _id: user._id,
       userId: user._id.toString(),
-      role: session.role
+      role: session.role || (user as any).role || 'customer'
     };
 
     next();

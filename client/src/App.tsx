@@ -510,19 +510,11 @@ export default function App() {
               />
               <Route 
                 path="/orders" 
-                element={
-                  <ProtectedRoute allowedRoles={['customer']}>
-                    <OrdersPage />
-                  </ProtectedRoute>
-                } 
+                element={<OrdersPage />} 
               />
               <Route 
                 path="/track/:orderId" 
-                element={
-                  <ProtectedRoute allowedRoles={['customer']}>
-                    <TrackingPage />
-                  </ProtectedRoute>
-                } 
+                element={<TrackingPage />} 
               />
               <Route 
                 path="/profile" 

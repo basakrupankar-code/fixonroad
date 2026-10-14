@@ -81,16 +81,10 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
       { to: '/mechanic#benefits', label: t('nav.benefits', 'Benefits'), isAnchor: true },
       { to: '/mechanic#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
     ];
-  } else if (user?.role === 'customer') {
-    navLinks = [
-      { to: '/services', label: t('nav.services', 'Services') },
-      { to: '/orders', label: 'My Bookings' },
-      { to: '/mechanic', label: t('nav.forMechanics', 'For Mechanics') },
-      { to: '/#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
-    ];
   } else {
     navLinks = [
       { to: '/services', label: t('nav.services', 'Services') },
+      { to: '/orders', label: 'My Bookings' },
       { to: '/mechanic', label: t('nav.forMechanics', 'For Mechanics') },
       { to: '/#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
     ];
@@ -198,7 +192,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
             {/* User Profile / Logout or Sign In */}
             {isAuthenticated && user ? (
               <div className="hidden md:flex items-center gap-4">
-                {user.role === 'customer' && (
+                {user.role !== 'mechanic' && (
                   <Link 
                     to="/orders" 
                     className="text-xs font-bold px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/20 hover:text-orange-300 transition-all flex items-center gap-1.5 shadow-sm"
@@ -299,7 +293,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   )}
                 </Link>
               )}
-              {isAuthenticated && user?.role === 'customer' && (
+              {isAuthenticated && user?.role !== 'mechanic' && (
                 <Link
                   to="/orders"
                   onClick={() => setMobileOpen(false)}
