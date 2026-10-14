@@ -97,8 +97,16 @@ export function getFirebaseErrorMessage(error: any): string {
       return "An account already exists with this email address under a different sign-in method.";
     case "auth/user-disabled":
       return "This account has been disabled by an administrator.";
-    case "auth/internal-error":
-      return "Firebase internal authentication error. Please retry in a few moments.";
+    case "auth/internal-error": {
+      const serverResponse = error?.customData?._tokenResponse?.error?.message;
+      if (serverResponse) {
+        return `Firebase Auth Error (${serverResponse}). Please check your Google Cloud OAuth and Firebase configuration.`;
+      }
+      return (
+        error.message ||
+        "Firebase internal authentication error. Please verify Authorized Domains and Redirect URIs in Firebase & Google Cloud Console."
+      );
+    }
     default:
       if (msg.toLowerCase().includes("network")) {
         return "Network error while connecting to Google. Please check your connection.";
