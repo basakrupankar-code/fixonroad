@@ -8,6 +8,8 @@ const userSchema = new mongoose.Schema({
   role: { type: String, default: 'customer' },
   savedLocations: { type: [String], default: [] },
   activeOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
+  isTwoFactorEnabled: { type: Boolean, default: false },
+  twoFactorSecret: { type: String },
 }, { timestamps: true });
 
 export const User = mongoose.model('User', userSchema);

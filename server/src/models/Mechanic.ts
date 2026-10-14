@@ -17,7 +17,9 @@ const mechanicSchema = new mongoose.Schema({
   currentLocation: {
     lat: { type: Number, default: 0 },
     lng: { type: Number, default: 0 }
-  }
+  },
+  isTwoFactorEnabled: { type: Boolean, default: false },
+  twoFactorSecret: { type: String }
 }, { timestamps: true });
 
 export const Mechanic = mongoose.model('Mechanic', mechanicSchema);

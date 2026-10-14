@@ -1,26 +1,86 @@
 import express from 'express';
+import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
 import { setupRoutes } from './routes';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
-const allowedOrigins = process.env.CLIENT_ORIGIN 
-  ? process.env.CLIENT_ORIGIN.split(',').map(o => o.trim())
+// ── Rate Limiting ────────────────────────────────────────────────────────────
+// Global API rate limit: 300 requests per 15 minutes
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
+  message: {
+    error: {
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Too many requests from this IP address. Please try again after 15 minutes.'
+    }
+  }
+});
+
+// Sensitive auth rate limit: 30 attempts per 15 minutes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
+  message: {
+    error: {
+      code: 'AUTH_RATE_LIMIT_EXCEEDED',
+      message: 'Too many authentication attempts. Please try again after 15 minutes.'
+    }
+  }
+});
+
+app.use('/api', apiLimiter);
+app.use('/api/v1/auth', authLimiter);
+
+// ── Security Headers via Helmet ──────────────────────────────────────────────
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", 'https://checkout.razorpay.com'],
+      frameSrc: ["'self'", 'https://api.razorpay.com'],
+      connectSrc: ["'self'", 'https://api.razorpay.com', 'https://lumberjack.razorpay.com', 'wss:', 'ws:'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+    },
+  },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  frameguard: { action: 'deny' },
+  noSniff: true,
+}));
+
+const rawOrigins = process.env.CLIENT_ORIGIN 
+  ? process.env.CLIENT_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
   : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+
+// Never allow wildcard with credentials in production
+const allowedOrigins = rawOrigins.filter(o => o !== '*');
 
 app.use(cors({ 
   origin: (origin, callback) => {
-    // allow requests with no origin (like mobile apps or curl requests)
+    // Allow non-browser requests (e.g. mobile apps, server-to-server, curl)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error('Blocked by CORS policy'));
     }
   },
-  credentials: true 
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-razorpay-signature'],
 }));
 app.use('/api/v1/payments/webhook/razorpay', express.raw({ type: 'application/json' }));
 app.use(express.json({

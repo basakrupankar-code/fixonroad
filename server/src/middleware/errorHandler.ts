@@ -20,9 +20,14 @@ export const errorHandler = (
     });
   }
 
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
-  const code = err.code || 'INTERNAL_ERROR';
+  const statusCode = err.statusCode || (typeof err.status === 'number' ? err.status : 500);
+  const isProd = process.env.NODE_ENV === 'production';
+  const code = err.code || (statusCode >= 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');
+  
+  // Never leak internal database errors or library exceptions to clients in production
+  const message = statusCode >= 500 && isProd
+    ? 'Internal Server Error. Please contact support if the issue persists.'
+    : (err.message || 'Internal Server Error');
 
   res.status(statusCode).json({
     error: {

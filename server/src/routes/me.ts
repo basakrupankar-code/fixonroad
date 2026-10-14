@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { User } from '../models/User';
 import { Mechanic } from '../models/Mechanic';
+import { Session } from '../models/Session';
 import { requireAuth } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -8,6 +9,7 @@ import { authenticator } from 'otplib';
 import qrcode from 'qrcode';
 
 const PasswordSchema = z.object({
+  currentPassword: z.string().optional(),
   password: z.string(),
   email: z.string().optional(),
 }).superRefine((data, ctx) => {
@@ -111,19 +113,39 @@ router.patch('/password', async (req, res, next) => {
       return res.status(404).json({ error: { message: 'User not found' } });
     }
     
-    const { password } = PasswordSchema.parse({ 
+    const parsed = PasswordSchema.parse({ 
+      currentPassword: req.body.currentPassword,
       password: req.body.password,
       email: user.email 
     });
-    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // If user already has a password set, require and verify the current password
+    if (user.password) {
+      if (!parsed.currentPassword) {
+        return res.status(400).json({ error: { message: 'Current password is required to set a new password' } });
+      }
+      const isCurrentValid = await bcrypt.compare(parsed.currentPassword, user.password);
+      if (!isCurrentValid) {
+        return res.status(400).json({ error: { message: 'Incorrect current password' } });
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(parsed.password, 10);
     
     await Model.findByIdAndUpdate(
       req.user?.userId,
       { $set: { password: hashedPassword } },
       { runValidators: true }
     );
+
+    // Invalidate all OTHER sessions across devices for security
+    const currentToken = req.cookies?.session_token;
+    await Session.deleteMany({
+      userId: user._id,
+      sessionToken: { $ne: currentToken }
+    });
     
-    res.json({ message: 'Password updated successfully' });
+    res.json({ success: true, message: 'Password updated successfully. Other device sessions revoked.' });
   } catch (error) {
     next(error);
   }

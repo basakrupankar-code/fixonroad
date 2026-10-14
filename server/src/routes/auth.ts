@@ -47,25 +47,35 @@ const generateSession = async (userId: any, role: 'customer' | 'mechanic', res: 
   });
 };
 
+const LoginSchema = z.object({
+  email: z.string().email('Invalid email address').transform(e => e.toLowerCase().trim()),
+  password: z.string().min(1, 'Password is required')
+});
+
 // 1. Register endpoint
 router.post('/register', async (req, res, next) => {
   try {
     const data = RegisterSchema.parse(req.body);
+    const normalizedEmail = data.email.toLowerCase().trim();
 
     const Model: any = data.role === 'mechanic' ? Mechanic : User;
 
-    const existingUser = await Model.findOne({ 
-      $or: [{ email: data.email }, { phone: data.phone }, { name: data.name }] 
-    });
+    const existingFilter: any[] = [{ email: normalizedEmail }];
+    if (data.phone) {
+      existingFilter.push({ phone: data.phone });
+    }
+
+    const existingUser = await Model.findOne({ $or: existingFilter });
 
     if (existingUser) {
-      return res.status(400).json({ error: { code: 'USER_EXISTS', message: 'Email, phone, or name already exists' } });
+      return res.status(400).json({ error: { code: 'USER_EXISTS', message: 'An account with this email or phone already exists' } });
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
     const user = await Model.create({
       ...data,
+      email: normalizedEmail,
       password: hashedPassword,
     });
 
@@ -90,10 +100,7 @@ router.post('/register', async (req, res, next) => {
 // 2. Login endpoint
 router.post('/login', async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: { message: 'Email and password are required' } });
-    }
+    const { email, password } = LoginSchema.parse(req.body);
 
     let user: any = await User.findOne({ email });
     let isMechanic = false;
@@ -159,36 +166,83 @@ router.post('/google-login', async (req, res, next) => {
   try {
     const { idToken, role } = req.body;
 
-    if (!idToken) {
+    if (!idToken || typeof idToken !== 'string') {
       return res.status(400).json({ error: { code: 'NO_TOKEN', message: 'No ID token provided' } });
     }
 
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
-    const { email, name } = decodedToken;
+    let decodedEmail: string | undefined;
+    let decodedName: string | undefined;
 
-    if (!email) {
-      return res.status(400).json({ error: { code: 'NO_EMAIL', message: 'Google account has no email' } });
+    // 1. Attempt verification via Firebase Admin SDK
+    try {
+      const decoded = await adminAuth.verifyIdToken(idToken);
+      decodedEmail = decoded.email;
+      decodedName = decoded.name;
+    } catch (adminErr: any) {
+      // 2. Fallback verification via Google's OAuth2 tokeninfo endpoint
+      // (ensures verification succeeds even if Firebase Admin service account key is not present)
+      try {
+        const tokenRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+        if (tokenRes.ok) {
+          const tokenInfo = await tokenRes.json();
+          if (tokenInfo.email && (tokenInfo.email_verified === 'true' || tokenInfo.email_verified === true)) {
+            decodedEmail = tokenInfo.email;
+            decodedName = tokenInfo.name || tokenInfo.given_name;
+          }
+        }
+      } catch (fetchErr) {
+        console.error('Google tokeninfo fallback error:', fetchErr);
+      }
     }
 
-    let user: any;
-    if (role === 'mechanic') {
-      user = await Mechanic.findOne({ email });
+    if (!decodedEmail) {
+      return res.status(401).json({ error: { code: 'INVALID_TOKEN', message: 'Invalid or expired Google token' } });
+    }
+
+    const normalizedEmail = decodedEmail.toLowerCase().trim();
+    const effectiveRole = role === 'mechanic' ? 'mechanic' : 'customer';
+    const Model: any = effectiveRole === 'mechanic' ? Mechanic : User;
+
+    let user: any = await Model.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      try {
+        if (effectiveRole === 'mechanic') {
+          user = await Mechanic.create({
+            email: normalizedEmail,
+            name: decodedName || 'Mechanic Partner',
+            role: 'mechanic',
+            workshopName: `${decodedName || 'Partner'}'s Auto Garage`,
+            serviceCategories: ['General Service', 'Flat Tyre', 'Battery Jumpstart'],
+            specialization: 'Multi-Brand Specialist',
+            serviceRadius: 10,
+            isAvailable: true,
+            currentLocation: { lat: 22.9772, lng: 88.4312 }
+          });
+        } else {
+          user = await User.create({
+            email: normalizedEmail,
+            name: decodedName || 'Google User',
+            role: 'customer',
+          });
+        }
+      } catch (createErr: any) {
+        // Prevent race condition if two concurrent requests create the account at the same time
+        if (createErr.code === 11000) {
+          user = await Model.findOne({ email: normalizedEmail });
+        } else {
+          throw createErr;
+        }
+      }
     } else {
-      user = await User.findOne({ email });
+      if (!user.name && decodedName) {
+        user.name = decodedName;
+        await user.save();
+      }
     }
 
     if (!user) {
-      const Model: any = role === 'mechanic' ? Mechanic : User;
-      user = await Model.create({
-        email,
-        name: name || 'Google User',
-        role: role === 'mechanic' ? 'mechanic' : 'customer',
-      });
-    } else {
-      if (!user.name) {
-        user.name = name || 'Google User';
-        await user.save();
-      }
+      return res.status(500).json({ error: { message: 'Failed to initialize user session' } });
     }
 
     await generateSession(user._id, user.role, res);
@@ -200,12 +254,13 @@ router.post('/google-login', async (req, res, next) => {
         phone: user.phone, 
         name: user.name, 
         email: user.email,
-        role: user.role
+        role: user.role,
+        workshopName: user.workshopName,
       }
     });
   } catch (error: any) {
-    console.error('Firebase Auth error:', error);
-    res.status(401).json({ error: { code: 'INVALID_TOKEN', message: 'Invalid or expired Google token' } });
+    console.error('Google login processing error:', error);
+    res.status(500).json({ error: { code: 'AUTH_ERROR', message: 'Failed to process Google sign-in' } });
   }
 });
 

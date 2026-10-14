@@ -222,8 +222,8 @@ export default function PartnerAuth() {
   };
 
   const handleGoogleLogin = async () => {
-    if (!firebaseAuth || Object.keys(firebaseAuth).length === 0 || !firebaseAuth.name) {
-      toast.error('Firebase is not configured! Please add your VITE_FIREBASE_* credentials.');
+    if (!firebaseAuth || (!firebaseAuth.app && Object.keys(firebaseAuth).length === 0)) {
+      toast.error('Firebase is not configured! Please check your VITE_FIREBASE_* credentials.');
       return;
     }
 

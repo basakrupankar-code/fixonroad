@@ -39,30 +39,36 @@ const createRazorpayOrder = async (amountPaise: number, receiptId: string, notes
   return response.json();
 };
 
-// Helper to verify Razorpay HMAC-SHA256 signature
+// Helper to verify Razorpay HMAC-SHA256 signature using constant-time comparison
 const verifyRazorpaySignature = (orderId: string, paymentId: string, signature: string): boolean => {
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
-  if (!keySecret) return false;
+  if (!keySecret || !signature) return false;
 
   const generatedSignature = crypto
     .createHmac('sha256', keySecret)
     .update(`${orderId}|${paymentId}`)
     .digest('hex');
 
-  return generatedSignature === signature;
+  const genBuf = Buffer.from(generatedSignature, 'utf8');
+  const sigBuf = Buffer.from(signature, 'utf8');
+  if (genBuf.length !== sigBuf.length) return false;
+  return crypto.timingSafeEqual(genBuf, sigBuf);
 };
 
-// Helper to verify Razorpay Webhook HMAC-SHA256 signature
+// Helper to verify Razorpay Webhook HMAC-SHA256 signature using constant-time comparison
 const verifyWebhookSignature = (rawBody: string | Buffer, signature: string): boolean => {
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
-  if (!webhookSecret) return false;
+  if (!webhookSecret || !signature) return false;
 
   const generated = crypto
     .createHmac('sha256', webhookSecret)
     .update(rawBody)
     .digest('hex');
 
-  return generated === signature;
+  const genBuf = Buffer.from(generated, 'utf8');
+  const sigBuf = Buffer.from(signature, 'utf8');
+  if (genBuf.length !== sigBuf.length) return false;
+  return crypto.timingSafeEqual(genBuf, sigBuf);
 };
 
 // Public config endpoint so frontend can fetch active test key
@@ -104,6 +110,10 @@ router.post('/create-order', requireAuth, async (req, res, next) => {
       order = await Order.findById(parsed.bookingId);
       if (!order) {
         return res.status(404).json({ success: false, message: 'Booking not found' });
+      }
+      const currentUserId = req.user?.userId || req.user?._id?.toString();
+      if (order.userId.toString() !== currentUserId) {
+        return res.status(403).json({ success: false, message: 'Forbidden. You do not own this booking.' });
       }
       order.paymentMethod = parsed.paymentMethod;
       order.expiresAt = expiresAt;
@@ -196,14 +206,27 @@ const handlePaymentVerification = async (req: any, res: any, next: any) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
+    // Ownership check (BOLA / IDOR protection)
+    const currentUserId = req.user?.userId || req.user?._id?.toString();
+    if (order.userId.toString() !== currentUserId && req.user?.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Forbidden. You do not have permission to verify this order.' });
+    }
+
     if (order.status === 'EXPIRED' || (order.expiresAt && order.expiresAt < new Date())) {
       order.status = 'EXPIRED';
       await order.save();
       return res.status(400).json({ success: false, message: 'Payment window expired' });
     }
 
-    // Verify Razorpay HMAC signature if online payment identifiers are provided
-    if (razorpay_order_id && razorpay_payment_id && razorpay_signature) {
+    // For online payment methods, signatures are STRICTLY MANDATORY (prevents payment bypass)
+    if (order.paymentMethod !== 'cod') {
+      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Payment verification failed: razorpay_order_id, razorpay_payment_id, and razorpay_signature are required for online payments.' 
+        });
+      }
+
       const isValid = verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
       if (!isValid) {
         order.status = 'FAILED';
@@ -216,13 +239,23 @@ const handlePaymentVerification = async (req: any, res: any, next: any) => {
       order.razorpaySignature = razorpay_signature;
     }
 
-    order.status = 'PAID';
-    await order.save();
+    const updatedOrder = await Order.findOneAndUpdate(
+      { _id: targetId },
+      {
+        $set: {
+          status: 'PAID',
+          ...(razorpay_order_id && { razorpayOrderId: razorpay_order_id }),
+          ...(razorpay_payment_id && { razorpayPaymentId: razorpay_payment_id }),
+          ...(razorpay_signature && { razorpaySignature: razorpay_signature })
+        }
+      },
+      { new: true }
+    );
 
     res.json({
       success: true,
       message: 'Payment verified successfully',
-      data: order,
+      data: updatedOrder,
       status: 'PAID'
     });
   } catch (error) {
@@ -237,6 +270,15 @@ router.post('/verify', requireAuth, handlePaymentVerification);
 router.post('/webhook/razorpay', async (req, res) => {
   try {
     const signature = req.headers['x-razorpay-signature'] as string;
+    if (!signature) {
+      return res.status(400).json({ success: false, message: 'Missing x-razorpay-signature header' });
+    }
+
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      return res.status(500).json({ success: false, message: 'Webhook secret not configured on server' });
+    }
+
     let rawBody: string | Buffer = '';
     
     if (Buffer.isBuffer(req.body)) {
@@ -249,11 +291,9 @@ router.post('/webhook/razorpay', async (req, res) => {
       rawBody = JSON.stringify(req.body);
     }
 
-    if (signature && process.env.RAZORPAY_WEBHOOK_SECRET) {
-      const isValid = verifyWebhookSignature(rawBody, signature);
-      if (!isValid) {
-        return res.status(400).json({ success: false, message: 'Invalid webhook signature' });
-      }
+    const isValid = verifyWebhookSignature(rawBody, signature);
+    if (!isValid) {
+      return res.status(400).json({ success: false, message: 'Invalid webhook signature' });
     }
 
     let body: any = {};
