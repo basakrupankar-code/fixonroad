@@ -1,28 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wrench, Menu, X, Globe, MapPin, RefreshCw, ShoppingCart, Package } from 'lucide-react';
-import { useTheme } from './ThemeProvider';
+import { 
+  Wrench, Menu, X, Globe, MapPin, RefreshCw, Package, 
+  ChevronDown, User as UserIcon, LogOut, PhoneCall, 
+  AlertTriangle, ShieldCheck, Check, Sparkles, Navigation
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
-import { useCart } from '../context/CartContext';
+import { safeFetch } from '../lib/api';
 
-// Helper for hash links across pages
+// Helper for smooth hash links across pages
 const HashLink = ({ to, children, className, onClick }: any) => {
   const location = useLocation();
-  const [targetPath, targetHash] = to.split("#");
+  const [targetPath, targetHash] = to.split('#');
 
   const handleClick = (e: any) => {
     if (onClick) onClick(e);
-    
-    // Check if we are already on the target page
-    const isSamePage = location.pathname === (targetPath || "/");
-    
+    const isSamePage = location.pathname === (targetPath || '/');
     if (isSamePage && targetHash) {
       e.preventDefault();
       const el = document.getElementById(targetHash);
-      if (el) el.scrollIntoView({ behavior: "smooth" });
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
       window.history.pushState(null, '', `#${targetHash}`);
     }
   };
@@ -35,20 +35,82 @@ const HashLink = ({ to, children, className, onClick }: any) => {
 };
 
 export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mechanic' }) {
-  const { theme } = useTheme();
   const { user, isAuthenticated, logout } = useAuth();
-  const { itemCount } = useCart();
   const { t, i18n } = useTranslation();
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-
   const { city, isLocating, fetchLocation, setCity, setAddress } = useLocationContext();
 
+  const [scrolled, setScrolled] = useState<boolean>(false);
+  const [mobileOpen, setMobileOpen] = useState<boolean>(false);
+  const [profileOpen, setProfileOpen] = useState<boolean>(false);
+  const [langOpen, setLangOpen] = useState<boolean>(false);
+  const [hasActiveOrder, setHasActiveOrder] = useState<boolean>(false);
+
+  const profileRef = useRef<HTMLDivElement>(null);
+  const langRef = useRef<HTMLDivElement>(null);
+
+  // Sticky navbar shadow and backdrop blur on scroll
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 15);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Close menus on route change
+  useEffect(() => {
+    setMobileOpen(false);
+    setProfileOpen(false);
+    setLangOpen(false);
+  }, [location.pathname]);
+
+  // Outside click listener for floating dropdowns
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  // Check for active dispatch orders dynamically to show pulsing radar badge
+  useEffect(() => {
+    let isMounted = true;
+    if (isAuthenticated && user?.role !== 'mechanic') {
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      safeFetch('/api/v1/bookings', { headers })
+        .then((res) => {
+          if (!isMounted) return;
+          const list = res?.orders || res?.bookings || (Array.isArray(res) ? res : []);
+          const active = list.some((o: any) =>
+            ['PENDING', 'CONFIRMED', 'ASSIGNED', 'MECHANIC_ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(
+              (o.status || '').toUpperCase()
+            )
+          );
+          setHasActiveOrder(active);
+        })
+        .catch(() => {
+          if (isMounted) setHasActiveOrder(false);
+        });
+    } else {
+      setHasActiveOrder(false);
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, user?.role, location.pathname]);
+
   const handleManualLocation = () => {
-    const override = window.prompt("Enter your breakdown city/location (e.g., Samudragar, West Bengal):", city);
-    if (override && override.trim() !== "") {
+    const override = window.prompt('Enter your breakdown city or area (e.g. Kalyani, WB):', city);
+    if (override && override.trim() !== '') {
       const formatted = override.trim();
       setCity(formatted);
       setAddress(formatted);
@@ -58,274 +120,519 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
     }
   };
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  // Close mobile menu on route change
-  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
-
   const isMechanic = variant === 'mechanic' || user?.role === 'mechanic';
-  const accentColor = 'text-orange-400';
+  const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
 
-  let navLinks = [];
-  if (user?.role === 'mechanic') {
-    navLinks = [
-      { to: '/mechanic-dashboard', label: 'Partner Portal' },
-    ];
-  } else if (variant === 'mechanic' && !isAuthenticated) {
-    navLinks = [
-      { to: '/', label: t('nav.switchToRider', 'Switch to Rider/Driver View') },
-      { to: '/mechanic#benefits', label: t('nav.benefits', 'Benefits'), isAnchor: true },
-      { to: '/mechanic#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
-    ];
-  } else {
-    navLinks = [
-      { to: '/services', label: t('nav.services', 'Services') },
-      { to: '/orders', label: 'My Bookings' },
-      { to: '/mechanic', label: t('nav.forMechanics', 'For Mechanics') },
-      { to: '/#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
-    ];
-  }
+  // Navigation Links configuration
+  const navLinks = [
+    { to: '/services', label: t('nav.services', 'Services') },
+    { to: '/#how-it-works', label: t('nav.howItWorks', 'How It Works'), isAnchor: true },
+    { 
+      to: '/orders', 
+      label: 'Track Orders', 
+      hasPulse: hasActiveOrder 
+    },
+  ];
 
   return (
     <>
-      <motion.nav
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        className={`fixed top-0 w-full z-50 transition-all duration-300 ${
+      <header
+        className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 font-['Outfit',sans-serif] ${
           scrolled
-            ? 'glass-panel border-b-0 py-3'
-            : 'bg-transparent py-5'
+            ? 'bg-[#0B0F17]/90 backdrop-blur-xl border-b border-slate-800/90 shadow-2xl shadow-black/60 py-3'
+            : 'bg-[#0B0F17]/70 backdrop-blur-md border-b border-slate-800/40 py-4'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-5 md:px-10 flex justify-between items-center">
-          {/* Logo */}
-          <Link to={isMechanic ? '/mechanic' : '/'} className="flex items-center gap-2.5 group">
-            <div className="p-1.5 rounded-lg transition-all duration-300 group-hover:scale-110 bg-orange-500/10">
-              <Wrench className={`w-6 h-6 ${accentColor}`} />
-            </div>
-            <span className="text-xl font-bold font-['Outfit'] tracking-tight">
-              FixOnRoad<span className={accentColor}>.</span>
-            </span>
-            {isMechanic && (
-              <span className="ml-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20 uppercase tracking-widest">
-                {t('nav.mechanicsLabel', 'Mechanics')}
-              </span>
-            )}
-          </Link>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+          
+          {/* ========================================================= */}
+          {/* LEFT SECTION: Brand Logo + Interactive Pinned Location     */}
+          {/* ========================================================= */}
+          <div className="flex items-center gap-4 sm:gap-6">
+            {/* Brand Logo */}
+            <Link to={isMechanic ? '/mechanic' : '/'} className="flex items-center gap-2.5 group">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 border border-orange-500/30 text-orange-400 group-hover:scale-105 group-hover:shadow-[0_0_15px_rgba(249,115,22,0.4)] transition-all">
+                <Wrench className="w-5 h-5 text-orange-400 group-hover:rotate-12 transition-transform duration-300" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center">
+                  FixOnRoad<span className="text-orange-500 text-2xl leading-none">.</span>
+                </span>
+                {isMechanic && (
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-orange-400 -mt-1">
+                    Partner Portal
+                  </span>
+                )}
+              </div>
+            </Link>
 
-          {/* Location Picker (hidden on mobile) */}
-          {(user?.role === 'customer' || (!isAuthenticated && variant !== 'mechanic')) && (
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs ml-6">
-              <MapPin className="w-3.5 h-3.5 text-orange-400" />
-              <span 
-                className="text-gray-300 max-w-[120px] truncate cursor-pointer hover:text-white transition-colors"
-                onClick={handleManualLocation}
-                title="Click to manually override location"
+            {/* Pinned Location Chip (Desktop & Tablet) */}
+            <div className="hidden md:flex items-center">
+              <div 
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-orange-500/40 text-xs text-slate-300 transition-all shadow-inner group"
               >
-                {city.split(',')[0]}
-              </span>
-              <button onClick={fetchLocation} disabled={isLocating} className="hover:text-white transition-colors disabled:opacity-50 ml-1">
-                <RefreshCw className={`w-3.5 h-3.5 text-gray-400 ${isLocating ? 'animate-spin' : ''}`} />
-              </button>
+                <MapPin className="w-3.5 h-3.5 text-orange-400 group-hover:animate-bounce" />
+                <button
+                  onClick={handleManualLocation}
+                  className="max-w-[130px] lg:max-w-[160px] truncate text-left font-medium text-slate-200 hover:text-white transition-colors"
+                  title="Click to manually change breakdown city"
+                >
+                  {city ? city.split(',')[0] : 'Kalyani, WB'}
+                </button>
+                <button
+                  onClick={fetchLocation}
+                  disabled={isLocating}
+                  className="ml-0.5 p-0.5 text-slate-400 hover:text-orange-400 transition-colors disabled:opacity-50"
+                  title="Auto-detect location from GPS"
+                  aria-label="Refresh Location"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isLocating ? 'animate-spin text-orange-400' : ''}`} />
+                </button>
+              </div>
             </div>
-          )}
+          </div>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-7 text-[15px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-            {navLinks.map(link =>
-              link.isAnchor ? (
-                <HashLink key={link.label} to={link.to} className="hover:text-[var(--text-primary)] transition-colors duration-200">
+          {/* ========================================================= */}
+          {/* CENTER SECTION: Clean Spaced Navigation Links             */}
+          {/* ========================================================= */}
+          <nav className="hidden lg:flex items-center gap-8 text-sm font-semibold">
+            {navLinks.map((link) => {
+              const isActive = location.pathname === link.to;
+              return link.isAnchor ? (
+                <HashLink
+                  key={link.label}
+                  to={link.to}
+                  className="text-slate-300 hover:text-white hover:text-orange-400 transition-colors py-1 relative"
+                >
                   {link.label}
                 </HashLink>
               ) : (
                 <Link
                   key={link.label}
                   to={link.to}
-                  className={`hover:text-[var(--text-primary)] transition-colors duration-200 ${
-                    location.pathname === link.to ? 'text-[var(--text-primary)]' : ''
+                  className={`py-1 relative transition-colors flex items-center gap-1.5 ${
+                    isActive ? 'text-white' : 'text-slate-300 hover:text-white'
                   }`}
                 >
-                  {link.label}
-                </Link>
-              )
-            )}
-          </div>
-
-          {/* Right Actions */}
-          <div className="flex items-center gap-3">
-            {/* Language Selector */}
-            <div className="relative group">
-              <button className="flex items-center gap-1.5 p-2 rounded-xl hover:bg-white/5 transition-colors text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
-                <Globe className="w-4 h-4" />
-                <span className="hidden md:inline uppercase">{i18n.language}</span>
-              </button>
-              <div className="absolute right-0 top-full mt-2 w-32 py-2 rounded-xl bg-[#1A1D24] border border-white/10 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                <button onClick={() => i18n.changeLanguage('en')} className={`w-full text-left px-4 py-2 text-sm hover:bg-white/5 ${i18n.language === 'en' ? 'text-orange-400' : 'text-gray-300'}`}>English</button>
-                <button onClick={() => i18n.changeLanguage('bn')} className={`w-full text-left px-4 py-2 text-sm hover:bg-white/5 ${i18n.language === 'bn' ? 'text-orange-400' : 'text-gray-300'}`}>Bengali</button>
-                <button onClick={() => i18n.changeLanguage('hi')} className={`w-full text-left px-4 py-2 text-sm hover:bg-white/5 ${i18n.language === 'hi' ? 'text-orange-400' : 'text-gray-300'}`}>Hindi</button>
-              </div>
-            </div>
-
-            {/* Cart Icon (only for authenticated customer) */}
-            {isAuthenticated && user?.role === 'customer' && (
-              <div className="relative">
-                <Link 
-                  to="/cart"
-                  className="relative p-2 rounded-xl hover:bg-white/5 transition-colors text-gray-300 hover:text-white inline-block"
-                  aria-label="View Cart"
-                >
-                  <ShoppingCart className="w-5 h-5" />
-                  {itemCount > 0 && (
-                    <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border border-[#0B0F17]">
-                      {itemCount}
+                  <span>{link.label}</span>
+                  {link.hasPulse && (
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
                     </span>
                   )}
+                  {isActive && (
+                    <motion.div
+                      layoutId="navPill"
+                      className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full"
+                    />
+                  )}
                 </Link>
-              </div>
-            )}
+              );
+            })}
 
-            {/* User Profile / Logout or Sign In */}
-            {isAuthenticated && user ? (
-              <div className="hidden md:flex items-center gap-4">
-                {user.role !== 'mechanic' && (
-                  <Link 
-                    to="/orders" 
-                    className="text-xs font-bold px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/20 hover:text-orange-300 transition-all flex items-center gap-1.5 shadow-sm"
-                  >
-                    <Package className="w-3.5 h-3.5" />
-                    <span>My Orders</span>
-                  </Link>
-                )}
-                <Link to="/profile" className="text-sm font-semibold hover:text-orange-400 transition-colors" style={{ color: 'var(--text-primary)' }}>
-                  {user.name || user.phone}
-                </Link>
-                <button
-                  onClick={logout}
-                  className="px-4 py-2 rounded-xl text-sm font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors"
-                >
-                  {t('nav.logout', 'Logout')}
-                </button>
-              </div>
+            {/* Partner Portal Secondary Outline Pill */}
+            {isMechanic ? (
+              <Link
+                to="/"
+                className="px-3.5 py-1.5 rounded-full border border-slate-700 hover:border-orange-500/50 bg-white/[0.02] text-xs font-semibold text-slate-300 hover:text-white transition-all"
+              >
+                Switch to Rider
+              </Link>
             ) : (
               <Link
-                to={isMechanic ? '/partner/auth' : '/auth'}
-                className={`hidden md:inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-                  isMechanic ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/20' : 'btn-primary'
-                }`}
+                to="/mechanic"
+                className="px-3.5 py-1.5 rounded-full border border-orange-500/30 hover:border-orange-500 bg-orange-500/5 hover:bg-orange-500/10 text-xs font-semibold text-orange-400 hover:text-orange-300 transition-all shadow-sm"
               >
-                <span className="relative z-10">{isMechanic ? t('nav.partnerLogin', 'Partner Login') : t('nav.signIn', 'Sign In')}</span>
+                For Mechanics
               </Link>
             )}
+          </nav>
 
-            {/* Mobile Hamburger */}
+          {/* ========================================================= */}
+          {/* RIGHT SECTION: Language, Auth & Profile State            */}
+          {/* ========================================================= */}
+          <div className="flex items-center gap-3">
+            
+            {/* Language Selector Dropdown */}
+            <div className="relative" ref={langRef}>
+              <button
+                onClick={() => setLangOpen(!langOpen)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition-all"
+                aria-label="Select Language"
+              >
+                <Globe className="w-3.5 h-3.5 text-slate-400" />
+                <span className="uppercase">{i18n.language || 'en'}</span>
+                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${langOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {langOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-36 py-1.5 rounded-2xl bg-[#121824] border border-slate-800 shadow-2xl shadow-black/80 z-50 backdrop-blur-xl"
+                  >
+                    {[
+                      { code: 'en', label: 'English' },
+                      { code: 'bn', label: 'বাংলা (Bengali)' },
+                      { code: 'hi', label: 'हिंदी (Hindi)' }
+                    ].map((item) => (
+                      <button
+                        key={item.code}
+                        onClick={() => {
+                          i18n.changeLanguage(item.code);
+                          setLangOpen(false);
+                        }}
+                        className={`w-full text-left px-3.5 py-2 text-xs font-semibold flex items-center justify-between hover:bg-white/[0.06] transition-colors ${
+                          i18n.language === item.code ? 'text-orange-400 font-bold' : 'text-slate-300'
+                        }`}
+                      >
+                        <span>{item.label}</span>
+                        {i18n.language === item.code && <Check className="w-3.5 h-3.5 text-orange-400" />}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Logged Out State: Sign In + Emergency CTA */}
+            {!isAuthenticated ? (
+              <div className="hidden sm:flex items-center gap-3">
+                <Link
+                  to={isMechanic ? '/partner/auth' : '/auth'}
+                  className="text-xs font-bold text-slate-300 hover:text-white px-3 py-2 transition-colors"
+                >
+                  {isMechanic ? 'Partner Login' : 'Sign In'}
+                </Link>
+
+                <Link
+                  to="/services"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 hover:scale-[1.02] transition-all"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>Emergency Help</span>
+                </Link>
+              </div>
+            ) : (
+              /* Logged In State: Emergency CTA + Interactive Profile Dropdown */
+              <div className="flex items-center gap-3">
+                {/* Emergency CTA button (only for customers) */}
+                {user?.role !== 'mechanic' && (
+                  <Link
+                    to="/services"
+                    className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 transition-all hover:scale-[1.02]"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>Emergency Help</span>
+                  </Link>
+                )}
+
+                {/* Profile Avatar & Interactive Dropdown */}
+                <div className="relative" ref={profileRef}>
+                  <button
+                    onClick={() => setProfileOpen(!profileOpen)}
+                    className="flex items-center gap-2 p-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-orange-500/30 transition-all group"
+                    aria-label="User profile menu"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-black text-xs shadow-inner ring-2 ring-orange-500/30 group-hover:ring-orange-500 transition-all">
+                      {userInitial}
+                    </div>
+                    <span className="hidden md:inline text-xs font-bold text-slate-200 group-hover:text-white max-w-[110px] truncate">
+                      {user?.name || user?.phone || 'Account'}
+                    </span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  <AnimatePresence>
+                    {profileOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        transition={{ duration: 0.18 }}
+                        className="absolute right-0 top-full mt-2 w-72 p-2 rounded-2xl bg-[#121824] border border-slate-800 shadow-2xl shadow-black/90 z-50 backdrop-blur-2xl"
+                      >
+                        {/* Profile Header Block */}
+                        <div className="p-3 bg-[#0B0F17]/80 rounded-xl border border-slate-800/80 mb-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-black text-sm shrink-0 shadow-md">
+                              {userInitial}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-bold text-sm text-white truncate">{user?.name || 'Customer'}</h4>
+                              <p className="text-xs text-slate-400 truncate">{user?.email || user?.phone || 'Signed in'}</p>
+                            </div>
+                          </div>
+                          <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                            <span className="text-slate-400">Account Type</span>
+                            <span className={`font-bold px-2 py-0.5 rounded ${
+                              user?.role === 'mechanic'
+                                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                                : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            }`}>
+                              {user?.role === 'mechanic' ? 'Certified Partner' : 'Customer'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Dropdown Menu Items */}
+                        <div className="space-y-1">
+                          <Link
+                            to="/orders"
+                            onClick={() => setProfileOpen(false)}
+                            className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors"
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <Package className="w-4 h-4 text-orange-400" />
+                              <span>My Bookings & Orders</span>
+                            </span>
+                            {hasActiveOrder && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30 animate-pulse">
+                                Active Dispatch
+                              </span>
+                            )}
+                          </Link>
+
+                          <Link
+                            to="/profile"
+                            onClick={() => setProfileOpen(false)}
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors"
+                          >
+                            <UserIcon className="w-4 h-4 text-slate-400" />
+                            <span>Profile & Account Settings</span>
+                          </Link>
+
+                          {user?.role === 'mechanic' && (
+                            <Link
+                              to="/mechanic-dashboard"
+                              onClick={() => setProfileOpen(false)}
+                              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors"
+                            >
+                              <ShieldCheck className="w-4 h-4 text-amber-400" />
+                              <span>Partner Portal Dashboard</span>
+                            </Link>
+                          )}
+
+                          <a
+                            href="tel:+919800112233"
+                            className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors"
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <PhoneCall className="w-4 h-4 text-emerald-400" />
+                              <span>Emergency Helpline</span>
+                            </span>
+                            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                              24/7
+                            </span>
+                          </a>
+                        </div>
+
+                        {/* Divider & Sign Out */}
+                        <div className="my-1.5 border-t border-slate-800/80" />
+
+                        <button
+                          onClick={() => {
+                            setProfileOpen(false);
+                            logout();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                        >
+                          <LogOut className="w-4 h-4 text-red-400" />
+                          <span>Sign Out</span>
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
+
+            {/* Mobile Hamburger Menu Toggle */}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="md:hidden p-2.5 rounded-xl"
-              style={{ background: 'var(--bg-card)' }}
-              aria-label="Toggle menu"
+              className="lg:hidden p-2 rounded-xl bg-white/[0.04] border border-white/10 text-slate-300 hover:text-white transition-colors"
+              aria-label="Toggle navigation menu"
             >
-              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileOpen ? <X className="w-5 h-5 text-orange-400" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
-        </div>
-      </motion.nav>
 
-      {/* Mobile Menu Overlay */}
+        </div>
+      </header>
+
+      {/* ========================================================= */}
+      {/* MOBILE RESPONSIVE DRAWER & OVERLAY                        */}
+      {/* ========================================================= */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 md:hidden"
+            className="fixed inset-0 z-50 lg:hidden"
           >
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+            {/* Backdrop Overlay */}
+            <div 
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setMobileOpen(false)} 
+            />
+
+            {/* Sliding Mobile Sheet */}
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="absolute right-0 top-0 h-full w-72 p-6 pt-20 flex flex-col gap-6"
-              style={{ background: 'var(--bg-primary)', borderLeft: '1px solid var(--border-primary)' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="absolute right-0 top-0 h-full w-80 max-w-[85vw] bg-[#121824] border-l border-slate-800 p-6 flex flex-col justify-between shadow-2xl z-50 overflow-y-auto"
             >
-              {navLinks.map(link =>
-                link.isAnchor ? (
-                  <HashLink
-                    key={link.label}
-                    to={link.to}
-                    onClick={() => setMobileOpen(false)}
-                    className="text-lg font-medium transition-colors"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    {link.label}
-                  </HashLink>
-                ) : (
-                  <Link
-                    key={link.label}
-                    to={link.to}
-                    className="text-lg font-medium transition-colors"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    {link.label}
-                  </Link>
-                )
-              )}
-              {isAuthenticated && user?.role === 'customer' && (
-                <Link
-                  to="/cart"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center justify-between text-lg font-medium transition-colors hover:text-white"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  <span className="flex items-center gap-2.5">
-                    <ShoppingCart className="w-5 h-5 text-orange-400" />
-                    <span>{t('nav.cart', 'Cart')}</span>
-                  </span>
-                  {itemCount > 0 && (
-                    <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-orange-500 text-white">
-                      {itemCount}
-                    </span>
-                  )}
-                </Link>
-              )}
-              {isAuthenticated && user?.role !== 'mechanic' && (
-                <Link
-                  to="/orders"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-2.5 text-lg font-medium transition-colors hover:text-white"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  <Package className="w-5 h-5 text-orange-400" />
-                  <span>My Bookings</span>
-                </Link>
-              )}
-              {isAuthenticated && user ? (
-                <div className="mt-4 text-center">
-                  <div className="mb-2">
-                    <Link to="/profile" onClick={() => setMobileOpen(false)} className="text-sm font-semibold hover:text-orange-400 transition-colors" style={{ color: 'var(--text-primary)' }}>
-                      {user.name || user.phone}
-                    </Link>
+              <div>
+                {/* Mobile Drawer Top Header */}
+                <div className="flex items-center justify-between pb-5 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400">
+                      <Wrench className="w-5 h-5" />
+                    </div>
+                    <span className="font-extrabold text-lg text-white">FixOnRoad</span>
                   </div>
-                  <button
-                    onClick={() => { logout(); setMobileOpen(false); }}
-                    className="w-full px-5 py-2.5 rounded-xl text-sm font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors"
+                  <button 
+                    onClick={() => setMobileOpen(false)}
+                    className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
                   >
-                    {t('nav.logout', 'Logout')}
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
-              ) : (
-                <Link
-                  to={isMechanic ? '/partner/auth' : '/auth'}
-                  className={`mt-4 text-center px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isMechanic ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/20' : 'btn-primary'}`}
+
+                {/* Location Chip for Mobile */}
+                <div className="mt-4 p-3 rounded-xl bg-[#0B0F17] border border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs text-slate-300">
+                    <MapPin className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                    <span className="truncate max-w-[150px]">{city ? city.split(',')[0] : 'Kalyani, WB'}</span>
+                  </div>
+                  <button
+                    onClick={handleManualLocation}
+                    className="text-[11px] font-bold text-orange-400 hover:underline"
+                  >
+                    Change
+                  </button>
+                </div>
+
+                {/* User Card if Authenticated */}
+                {isAuthenticated && user && (
+                  <div className="mt-4 p-3.5 rounded-xl bg-gradient-to-br from-orange-500/10 to-amber-500/5 border border-orange-500/20">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-orange-500 text-white font-bold flex items-center justify-center">
+                        {userInitial}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm text-white truncate">{user.name || 'Customer'}</p>
+                        <p className="text-xs text-slate-400 truncate">{user.email || user.phone}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mobile Links */}
+                <div className="mt-6 space-y-2">
+                  <Link
+                    to="/services"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/[0.05] transition-colors"
+                  >
+                    <Wrench className="w-4 h-4 text-orange-400" />
+                    <span>Roadside Services</span>
+                  </Link>
+
+                  <HashLink
+                    to="/#how-it-works"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/[0.05] transition-colors"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>How It Works</span>
+                  </HashLink>
+
+                  <Link
+                    to="/orders"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/[0.05] transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Package className="w-4 h-4 text-orange-400" />
+                      <span>Track Bookings & Orders</span>
+                    </div>
+                    {hasActiveOrder && (
+                      <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
+                    )}
+                  </Link>
+
+                  {isAuthenticated && (
+                    <Link
+                      to="/profile"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/[0.05] transition-colors"
+                    >
+                      <UserIcon className="w-4 h-4 text-slate-400" />
+                      <span>Account Settings</span>
+                    </Link>
+                  )}
+
+                  {isMechanic ? (
+                    <Link
+                      to="/"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-slate-300 hover:bg-white/[0.05]"
+                    >
+                      <Navigation className="w-4 h-4 text-slate-400" />
+                      <span>Switch to Driver/Rider</span>
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/mechanic"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-orange-400 hover:bg-orange-500/10"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-orange-400" />
+                      <span>Partner Portal (For Mechanics)</span>
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom Actions of Drawer */}
+              <div className="pt-6 border-t border-slate-800 space-y-3">
+                <a
+                  href="tel:+919800112233"
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition-all"
                 >
-                  <span className="relative z-10">{isMechanic ? t('nav.partnerLogin', 'Partner Login') : t('nav.signIn', 'Sign In')}</span>
-                </Link>
-              )}
+                  <PhoneCall className="w-4 h-4" />
+                  <span>Call Emergency Dispatch (24/7)</span>
+                </a>
+
+                {isAuthenticated ? (
+                  <button
+                    onClick={() => {
+                      logout();
+                      setMobileOpen(false);
+                    }}
+                    className="w-full py-2.5 rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 border border-red-500/20 transition-all flex items-center justify-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
+                  </button>
+                ) : (
+                  <Link
+                    to="/auth"
+                    onClick={() => setMobileOpen(false)}
+                    className="w-full block py-3 rounded-xl text-center text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/30 transition-all"
+                  >
+                    Sign In to FixOnRoad
+                  </Link>
+                )}
+              </div>
             </motion.div>
           </motion.div>
         )}
