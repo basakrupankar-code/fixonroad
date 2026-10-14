@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { safeFetch } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
+import { resolveOrderMechanic } from '../lib/mechanics';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -234,13 +235,25 @@ export default function TrackingPage() {
     };
   }, [orderId]);
 
+  // 1. Dynamic Mechanic Profile Resolution (Decoupled from hardcoded objects)
+  const resolvedMechanic = useMemo(() => {
+    return resolveOrderMechanic(order, orderId);
+  }, [order, orderId]);
+
+  const mechanicName = resolvedMechanic.name;
+  const mechanicSpecialty = resolvedMechanic.specialization;
+  const mechanicHub = resolvedMechanic.workshopName;
+  const mechanicVehicle = resolvedMechanic.vehicleDisplay;
+  const mechanicPhone = resolvedMechanic.phone;
+  const mechanicRating = resolvedMechanic.rating;
+
   // 2. Strict Coordinate Order Resolution: Hub (Origin) & User (Destination)
   const hubCoords = useMemo(() => {
-    const hub = order?.hubLocation || order?.mechanicId?.currentLocation;
-    const lat = typeof hub?.lat === 'number' && !isNaN(hub.lat) && hub.lat !== 0 ? hub.lat : 22.975;
-    const lng = typeof hub?.lng === 'number' && !isNaN(hub.lng) && hub.lng !== 0 ? hub.lng : 88.434; // Kalyani Hub
+    const hub = order?.hubLocation || order?.mechanicId?.currentLocation || (order as any)?.mechanic?.currentLocation;
+    const lat = typeof hub?.lat === 'number' && !isNaN(hub.lat) && hub.lat !== 0 ? hub.lat : resolvedMechanic.hubLocation.lat;
+    const lng = typeof hub?.lng === 'number' && !isNaN(hub.lng) && hub.lng !== 0 ? hub.lng : resolvedMechanic.hubLocation.lng;
     return { lat, lng };
-  }, [order]);
+  }, [order, resolvedMechanic]);
 
   const userCoords = useMemo(() => {
     const loc = order?.location;
@@ -335,17 +348,7 @@ export default function TrackingPage() {
   const rawStatus = (order?.status || 'dispatched').toLowerCase();
   const isPending = rawStatus === 'pending' || rawStatus === 'idle';
 
-  // Mechanic & Hub details
-  const mechanicName = order?.mechanicId?.name || 'Subhasish Ghosh';
-  const mechanicSpecialty = Array.isArray(order?.mechanicId?.serviceCategories) && order.mechanicId.serviceCategories.length > 0 
-    ? order.mechanicId.serviceCategories.join(' • ') 
-    : (order?.mechanicId?.specialization || 'Certified Two-Wheeler Specialist');
-  const mechanicHub = order?.mechanicId?.workshopName || 'FixOnRoad Kalyani Hub';
-  const mechanicVehicle = order?.mechanicId?.vehiclePlate 
-    ? `Motorcycle (${order.mechanicId.vehiclePlate})` 
-    : 'Service Bike (WB-12-AE-4921)';
-  const mechanicPhone = order?.mechanicId?.phone || '+91 98302 44109';
-  const mechanicRating = order?.mechanicId?.rating || 4.9;
+  // Mechanic details dynamically bound from resolvedMechanic
 
   const destinationAddress = 
     order?.location?.address || 

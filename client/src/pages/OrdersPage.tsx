@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { safeFetch } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { resolveOrderMechanic } from '../lib/mechanics';
 
 interface MechanicDetails {
   _id?: string;
@@ -421,7 +422,7 @@ export default function OrdersPage() {
                   order.address || 
                   'Your breakdown location';
 
-                const mech = order.mechanicId;
+                const mech = resolveOrderMechanic(order);
 
                 return (
                   <motion.div
@@ -479,41 +480,38 @@ export default function OrdersPage() {
                           </div>
                         </div>
 
-                        {/* Assigned Mechanic Partner Details */}
-                        <div className="sm:col-span-1 space-y-2 bg-[#0B0F17]/60 p-3 rounded-xl border border-slate-800/80">
-                          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                            <ShieldCheck className="w-3.5 h-3.5 text-orange-400" /> Assigned Mechanic
+                        {/* Assigned Mechanic Partner Details (Decoupled & Dynamic) */}
+                        <div className="sm:col-span-1 space-y-2 bg-[#0B0F17]/60 p-3.5 rounded-xl border border-slate-800/80">
+                          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                            <span className="flex items-center gap-1">
+                              <ShieldCheck className="w-3.5 h-3.5 text-orange-400" /> Assigned Mechanic
+                            </span>
+                            <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                              Verified
+                            </span>
                           </span>
-                          {mech && typeof mech === 'object' ? (
-                            <div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-bold text-white">{mech.name || 'Certified Partner'}</span>
-                                {mech.rating && (
-                                  <span className="text-[11px] text-orange-400 font-bold bg-orange-500/15 px-1.5 py-0.5 rounded border border-orange-500/20">
-                                    {mech.rating} ★
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-slate-400 truncate mt-0.5">{mech.workshopName || 'FixOnRoad Garage Hub'}</p>
-                              <div className="flex items-center gap-2 mt-2">
-                                {mech.vehiclePlate && (
-                                  <span className="text-[10px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                                    {mech.vehiclePlate}
-                                  </span>
-                                )}
-                                {mech.phone && (
-                                  <a 
-                                    href={`tel:${mech.phone}`}
-                                    className="text-[11px] text-emerald-400 font-semibold hover:underline flex items-center gap-1"
-                                  >
-                                    <PhoneCall className="w-3 h-3" /> Call
-                                  </a>
-                                )}
-                              </div>
+                          <div>
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-sm font-bold text-white truncate max-w-[150px]">{mech.name}</span>
+                              <span className="text-[11px] text-orange-400 font-bold bg-orange-500/15 px-1.5 py-0.5 rounded border border-orange-500/20 shrink-0">
+                                {mech.rating} ★
+                              </span>
                             </div>
-                          ) : (
-                            <p className="text-xs text-slate-400 italic">Assigning nearest certified workshop technician...</p>
-                          )}
+                            <p className="text-[11px] text-orange-400/90 font-medium truncate mt-0.5">{mech.specialization}</p>
+                            <p className="text-xs text-slate-400 truncate mt-0.5">{mech.workshopName}</p>
+                            <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-800/60">
+                              <span className="text-[10px] font-mono bg-slate-800/90 text-slate-300 px-2 py-0.5 rounded border border-slate-700/80 flex items-center gap-1 truncate">
+                                <Bike className="w-3 h-3 text-orange-400 shrink-0" />
+                                <span className="truncate">{mech.vehicleDisplay}</span>
+                              </span>
+                              <a 
+                                href={`tel:${mech.phone}`}
+                                className="text-[11px] text-emerald-400 font-semibold hover:underline flex items-center gap-1 shrink-0 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/20 transition-colors"
+                              >
+                                <PhoneCall className="w-3 h-3" /> Call
+                              </a>
+                            </div>
+                          </div>
                         </div>
 
                         {/* Dispatch Distance & Action CTA */}

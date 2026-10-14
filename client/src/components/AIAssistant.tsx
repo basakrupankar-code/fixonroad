@@ -53,16 +53,29 @@ export default function AIAssistant() {
 
   return (
     <>
-      <button 
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 p-4 bg-orange-500 hover:bg-orange-600 text-white rounded-full shadow-2xl transition-transform hover:scale-110 z-40 flex items-center justify-center group"
-      >
-        <MessageSquare className="w-6 h-6" />
-        {/* Tooltip */}
-        <span className="absolute right-full mr-4 bg-[#121824] text-white text-xs font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity border border-slate-700 whitespace-nowrap">
-          Ask AI Assistant
-        </span>
-      </button>
+      {/* Floating Action Button (FAB) with Expanding Tooltip */}
+      {!isOpen && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center group">
+          {/* Expanding Tooltip to the Left */}
+          <div className="pointer-events-none mr-3 opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 ease-out">
+            <div className="px-3.5 py-1.5 rounded-full bg-[#121824]/90 backdrop-blur-md border border-orange-500/30 text-white text-xs font-bold tracking-wide shadow-xl shadow-black/50 whitespace-nowrap flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Ask AI Assistant</span>
+            </div>
+          </div>
+
+          {/* Glowing Amber/Orange FAB */}
+          <button 
+            onClick={() => setIsOpen(true)}
+            aria-label="Open AI Roadside Assistant"
+            className="w-14 h-14 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 shadow-lg shadow-orange-500/25 flex items-center justify-center text-white relative transition-all duration-300 hover:scale-110 hover:shadow-orange-500/50 hover:shadow-2xl border border-white/20 active:scale-95"
+          >
+            {/* Ambient Pulse Glow */}
+            <span className="absolute inset-0 rounded-full bg-orange-500/30 animate-ping opacity-60 pointer-events-none" />
+            <Bot className="w-6 h-6 text-white transition-transform group-hover:rotate-12 duration-300 relative z-10" />
+          </button>
+        </div>
+      )}
 
       <AnimatePresence>
         {isOpen && (

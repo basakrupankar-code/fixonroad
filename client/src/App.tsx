@@ -16,6 +16,7 @@ import { LocationProvider, useLocationContext } from './context/LocationContext'
 import { CartProvider } from './context/CartContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { useTranslation } from 'react-i18next';
+import { SEED_MECHANICS } from './lib/mechanics';
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import MechanicLanding from "./MechanicLanding";
@@ -100,22 +101,12 @@ function LiveTracker() {
   const [distance, setDistance] = useState(2.4);
   const [status, setStatus] = useState<"searching" | "found" | "arriving">("searching");
   
-  const orderId = localStorage.getItem('active_order_id') || '6ac8e7e0';
-
-  const featuredPartners = [
-    'Rajendra Mondal (Engine Specialist)',
-    'Sunil Yadav (Diagnostic Expert)',
-    'Mohammed Irfan (Multi-Brand Care)',
-    'Rupankar Basak (Auto Specialist)',
-    'Prakash Jadhav (Electrical Expert)',
-    'Debashis Roy (Roadside Master)'
-  ];
-  const [partnerName, setPartnerName] = useState(featuredPartners[0]);
+  const [partner, setPartner] = useState(SEED_MECHANICS[0]);
 
   useEffect(() => {
     const t1 = setTimeout(() => {
-      const randomPartner = featuredPartners[Math.floor(Math.random() * featuredPartners.length)];
-      setPartnerName(randomPartner);
+      const randomPartner = SEED_MECHANICS[Math.floor(Math.random() * SEED_MECHANICS.length)];
+      setPartner(randomPartner);
       setStatus("found");
     }, 2000);
     const t2 = setTimeout(() => setStatus("arriving"), 4000);
@@ -130,6 +121,8 @@ function LiveTracker() {
     }, 3000);
     return () => clearInterval(iv);
   }, [status]);
+
+  const orderId = localStorage.getItem('active_order_id') || '6ac8e7e0';
 
   return (
     <div 
@@ -160,11 +153,11 @@ function LiveTracker() {
           </div>
         </div>
         <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-primary)" }}>
-          <div>
-            <p className="font-semibold text-[15px]">{status === "searching" ? t('radar.findingMechanic', 'Finding nearest mechanic…') : partnerName}</p>
-            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>{status === "searching" ? t('radar.scanning', 'Scanning 5 km radius in sector...') : `${distance} km · ${eta} min ETA`}</p>
+          <div className="min-w-0 pr-2">
+            <p className="font-semibold text-[15px] truncate">{status === "searching" ? t('radar.findingMechanic', 'Finding nearest mechanic…') : `${partner.name}`}</p>
+            <p className="text-[13px] truncate" style={{ color: "var(--text-muted)" }}>{status === "searching" ? t('radar.scanning', 'Scanning 5 km radius in sector...') : `${partner.specialization} · ${partner.vehiclePlate}`}</p>
           </div>
-          <div className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide ${status === "searching" ? "bg-yellow-500/15 text-yellow-400" : status === "found" ? "bg-orange-500/15 text-orange-400" : "bg-emerald-500/15 text-emerald-400"}`}>
+          <div className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide shrink-0 ${status === "searching" ? "bg-yellow-500/15 text-yellow-400" : status === "found" ? "bg-orange-500/15 text-orange-400" : "bg-emerald-500/15 text-emerald-400"}`}>
             {status === "searching" ? t('radar.searching', 'Searching') : status === "found" ? t('radar.matched', 'Matched') : t('radar.enRoute', 'En Route')}
           </div>
         </div>
@@ -448,6 +441,7 @@ import TrackingPage from "./pages/TrackingPage";
 import OrdersPage from "./pages/OrdersPage";
 import CartPage from "./pages/CartPage";
 import AIAssistant from "./components/AIAssistant";
+import CustomCursor from "./components/CustomCursor";
 
 export default function App() {
   return (
@@ -457,6 +451,7 @@ export default function App() {
           <AuthProvider>
             <CartProvider>
             <BrowserRouter>
+              <CustomCursor />
               <ScrollToTop />
               <Toaster 
                 position="top-center" 

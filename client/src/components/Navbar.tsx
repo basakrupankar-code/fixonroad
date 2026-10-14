@@ -190,14 +190,16 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
           {/* ========================================================= */}
           {/* CENTER SECTION: Clean Spaced Navigation Links             */}
           {/* ========================================================= */}
-          <nav className="hidden lg:flex items-center gap-8 text-sm font-semibold">
+          <nav className="hidden lg:flex items-center gap-8 text-sm">
             {navLinks.map((link) => {
               const isActive = location.pathname === link.to;
               return link.isAnchor ? (
                 <HashLink
                   key={link.label}
                   to={link.to}
-                  className="text-slate-300 hover:text-white hover:text-orange-400 transition-colors py-1 relative"
+                  className={`py-1 relative text-zinc-300 hover:text-orange-400 active:text-orange-500 transition-colors duration-200 font-medium ${
+                    isActive ? 'text-white font-semibold' : ''
+                  }`}
                 >
                   {link.label}
                 </HashLink>
@@ -205,15 +207,17 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                 <Link
                   key={link.label}
                   to={link.to}
-                  className={`py-1 relative transition-colors flex items-center gap-1.5 ${
-                    isActive ? 'text-white' : 'text-slate-300 hover:text-white'
+                  className={`py-1 relative flex items-center gap-2 transition-colors duration-200 font-medium ${
+                    isActive
+                      ? 'text-white font-semibold'
+                      : 'text-zinc-300 hover:text-orange-400 active:text-orange-500'
                   }`}
                 >
                   <span>{link.label}</span>
                   {link.hasPulse && (
-                    <span className="flex h-2 w-2 relative">
+                    <span className="flex h-2.5 w-2.5 relative shrink-0">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-orange-500" />
                     </span>
                   )}
                   {isActive && (
@@ -496,32 +500,32 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   <Link
                     to="/services"
                     onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/[0.05] transition-colors"
+                    className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium text-zinc-300 hover:text-orange-400 active:text-orange-500 hover:bg-white/[0.05] transition-colors duration-200"
                   >
-                    <Wrench className="w-4 h-4 text-orange-400" />
+                    <Wrench className="w-4 h-4 text-orange-400 shrink-0" />
                     <span>{t('nav.services', 'Roadside Services')}</span>
                   </Link>
 
                   <HashLink
                     to="/#how-it-works"
                     onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/[0.05] transition-colors"
+                    className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium text-zinc-300 hover:text-orange-400 active:text-orange-500 hover:bg-white/[0.05] transition-colors duration-200"
                   >
-                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
                     <span>{t('nav.howItWorks', 'How It Works')}</span>
                   </HashLink>
 
                   <Link
                     to="/orders"
                     onClick={() => setMobileOpen(false)}
-                    className="flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/[0.05] transition-colors"
+                    className="flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium text-zinc-300 hover:text-orange-400 active:text-orange-500 hover:bg-white/[0.05] transition-colors duration-200"
                   >
                     <div className="flex items-center gap-3">
-                      <Package className="w-4 h-4 text-orange-400" />
+                      <Package className="w-4 h-4 text-orange-400 shrink-0" />
                       <span>{t('nav.trackOrders', 'Track Bookings & Orders')}</span>
                     </div>
                     {hasActiveOrder && (
-                      <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping shrink-0" />
                     )}
                   </Link>
 
