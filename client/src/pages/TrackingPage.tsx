@@ -8,6 +8,7 @@ import {
   ListOrdered, Radio, Sparkles
 } from 'lucide-react';
 import { safeFetch } from '../lib/api';
+import { useLanguage } from '../context/LanguageContext';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -171,6 +172,7 @@ interface OrderData {
 }
 
 export default function TrackingPage() {
+  const { t } = useLanguage();
   const { orderId } = useParams<{ orderId: string }>();
 
   // Default coordinate pairs: Kalyani Hub -> Samudragar
@@ -366,7 +368,7 @@ export default function TrackingPage() {
         {/* Top Header Navigation */}
         <div className="flex items-center justify-between gap-4 mb-6">
           <Link to="/" className="inline-flex items-center text-orange-400 hover:text-orange-300 font-semibold text-sm transition-colors">
-            <ChevronLeft className="w-4 h-4 mr-1" /> Back to Home
+            <ChevronLeft className="w-4 h-4 mr-1" /> {t('track.backHome', 'Back to Home')}
           </Link>
           
           <Link 
@@ -374,7 +376,7 @@ export default function TrackingPage() {
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:border-orange-500/40 text-sm font-medium text-slate-300 hover:text-white transition-all shadow-sm"
           >
             <ListOrdered className="w-4 h-4 text-orange-400" />
-            <span>My Bookings</span>
+            <span>{t('track.myBookings', 'My Bookings')}</span>
             <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
           </Link>
         </div>
@@ -388,7 +390,7 @@ export default function TrackingPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 border-b border-slate-800/80 pb-6">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Live Dispatch Tracking</h1>
+                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">{t('track.title', 'Live Dispatch Tracking')}</h1>
                 
                 {/* 4. Dynamic Status Badge */}
                 {isPending ? (
@@ -397,7 +399,7 @@ export default function TrackingPage() {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
                     </span>
-                    Finding Mechanic...
+                    {t('track.findingMechanic', 'Finding Mechanic...')}
                   </span>
                 ) : (
                   <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
@@ -405,14 +407,14 @@ export default function TrackingPage() {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                     </span>
-                    En Route on Service Bike
+                    {t('track.enRouteBike', 'En Route on Service Bike')}
                   </span>
                 )}
               </div>
 
               {/* 1. Dynamic Order ID Tag */}
               <div className="flex items-center gap-2 mt-2">
-                <span className="text-slate-400 text-sm font-medium">Tracking Code:</span>
+                <span className="text-slate-400 text-sm font-medium">{t('track.trackingCode', 'Tracking Code')}:</span>
                 <span className="font-mono text-sm font-bold text-orange-400 bg-orange-500/10 px-2.5 py-0.5 rounded-lg border border-orange-500/20">
                   {displayCode}
                 </span>
@@ -432,12 +434,12 @@ export default function TrackingPage() {
               {/* Road Distance */}
               <div className="text-left md:text-right">
                 <div className="text-slate-400 text-xs font-semibold mb-0.5 uppercase tracking-wider flex items-center gap-1">
-                  <Navigation2 className="w-3 h-3 text-orange-400" /> Road Distance
+                  <Navigation2 className="w-3 h-3 text-orange-400" /> {t('track.distance', 'Road Distance')}
                 </div>
                 <div className="text-xl font-black text-white">
                   {distance} <span className="text-xs font-medium text-slate-400">km</span>
                 </div>
-                <div className="text-[10px] text-slate-500 font-mono">OSRM Road Geometry</div>
+                <div className="text-[10px] text-slate-500 font-mono">{t('track.osrmGeometry', 'OSRM Road Geometry')}</div>
               </div>
 
               <div className="w-px h-10 bg-slate-800" />
@@ -445,7 +447,7 @@ export default function TrackingPage() {
               {/* Two-Wheeler ETA */}
               <div className="text-left md:text-right">
                 <div className="text-slate-400 text-xs font-semibold mb-0.5 uppercase tracking-wider flex items-center gap-1">
-                  <Bike className="w-3.5 h-3.5 text-orange-400" /> Bike ETA
+                  <Bike className="w-3.5 h-3.5 text-orange-400" /> {t('track.eta', 'Bike ETA')}
                 </div>
                 <div className="text-2xl font-black text-orange-400">
                   {eta} <span className="text-xs font-medium text-slate-400">min</span>
@@ -463,7 +465,7 @@ export default function TrackingPage() {
                     ? 'text-amber-400 bg-amber-500/10 border-amber-500/30' 
                     : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
                 }`}>
-                  {isPending ? 'Finding Mechanic...' : 'En Route on Service Bike'}
+                  {isPending ? t('track.findingMechanic', 'Finding Mechanic...') : t('track.enRouteBike', 'En Route on Service Bike')}
                 </span>
               </div>
             </div>
@@ -487,9 +489,9 @@ export default function TrackingPage() {
                     <div className="w-12 h-12 rounded-full bg-amber-500/15 border border-amber-500/40 flex items-center justify-center mb-3">
                       <Radio className="w-6 h-6 text-orange-400 animate-pulse" />
                     </div>
-                    <h3 className="font-bold text-lg text-white">Finding Mechanic...</h3>
+                    <h3 className="font-bold text-lg text-white">{t('track.findingMechanic', 'Finding Mechanic...')}</h3>
                     <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                      Pinging certified two-wheeler dispatch hubs near Kalyani-Samudragar sector. Matching fastest available service unit.
+                      {t('track.findingMechanicDesc', 'Pinging certified two-wheeler dispatch hubs near Kalyani-Samudragar sector. Matching fastest available service unit.')}
                     </p>
                     <div className="mt-3 flex items-center gap-1.5 text-[11px] font-mono text-orange-400/90 bg-orange-500/10 px-2.5 py-1 rounded-full border border-orange-500/20">
                       <Sparkles className="w-3 h-3 text-orange-400" />
@@ -538,10 +540,10 @@ export default function TrackingPage() {
 
                   <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
                     <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-slate-500" /> Dispatched on Service Bike
+                      <Clock className="w-3.5 h-3.5 text-slate-500" /> {t('track.enRouteBike', 'Dispatched on Service Bike')}
                     </span>
                     <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Background Verified
+                      <CheckCircle2 className="w-3.5 h-3.5" /> {t('track.verifiedBadge', 'Background Verified')}
                     </span>
                   </div>
                 </div>
@@ -565,7 +567,7 @@ export default function TrackingPage() {
                     {/* Origin Hub */}
                     <div className="relative z-10">
                       <div className="absolute -left-6 w-3 h-3 bg-orange-500 rounded-full border-2 border-[#0B0F17] shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
-                      <p className="text-[10px] text-orange-400 font-black uppercase tracking-wider">Dispatched From</p>
+                      <p className="text-[10px] text-orange-400 font-black uppercase tracking-wider">{t('track.dispatchedFrom', 'Dispatched From Hub')}</p>
                       <p className="text-sm font-semibold text-white mt-0.5">{mechanicHub}</p>
                       <p className="text-xs text-slate-400 font-mono">Hub Location: {hubCoords.lat.toFixed(3)}° N, {hubCoords.lng.toFixed(3)}° E</p>
                     </div>
@@ -573,7 +575,7 @@ export default function TrackingPage() {
                     {/* Customer Destination */}
                     <div className="relative z-10">
                       <div className="absolute -left-6 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#0B0F17] shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                      <p className="text-[10px] text-emerald-400 font-black uppercase tracking-wider">Your Breakdown Spot</p>
+                      <p className="text-[10px] text-emerald-400 font-black uppercase tracking-wider">{t('track.breakdownSpot', 'Your Breakdown Spot')}</p>
                       <p className="text-sm font-semibold text-white mt-0.5 line-clamp-2">{destinationAddress}</p>
                       <p className="text-xs text-slate-400 font-mono">Customer Location: {userCoords.lat.toFixed(3)}° N, {userCoords.lng.toFixed(3)}° E</p>
                     </div>
@@ -581,9 +583,9 @@ export default function TrackingPage() {
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Payment Mode</span>
+                  <span className="text-slate-400">{t('track.paymentMode', 'Payment Mode')}</span>
                   <span className="font-semibold text-white">
-                    {paymentStatus === 'PAID' ? 'Paid Online via Razorpay' : 'Cash / UPI on Service Arrival'}
+                    {paymentStatus === 'PAID' ? t('checkout.onlinePayment', 'Paid Online via Razorpay') : t('checkout.cashOnDelivery', 'Cash / UPI on Service Arrival')}
                   </span>
                 </div>
               </div>
@@ -668,7 +670,7 @@ export default function TrackingPage() {
               {/* Floating Overlay Badge on Map */}
               <div className="absolute bottom-4 left-4 z-[400] bg-[#0B0F17]/90 backdrop-blur-md border border-slate-700/80 px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-xl">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#FF6B00] shadow-[0_0_8px_#FF6B00]" />
-                <span className="font-bold text-white">OSRM Road Geometry:</span>
+                <span className="font-bold text-white">{t('track.osrmGeometry', 'OSRM Road Geometry')}:</span>
                 <span className="text-slate-300 font-mono font-semibold">{distance} km</span>
               </div>
             </div>

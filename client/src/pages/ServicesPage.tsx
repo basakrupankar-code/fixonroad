@@ -478,19 +478,19 @@ export default function ServicesPage() {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-[#0A0D14] p-3 rounded-xl border border-slate-800">
-                  <p className="text-xs text-gray-500">Base Price</p>
+                  <p className="text-xs text-gray-500">{t('checkout.basePrice', 'Base Price')}</p>
                   <p className="text-sm font-semibold text-white">₹{selectedService.price}</p>
                 </div>
                 <div className="bg-[#0A0D14] p-3 rounded-xl border border-slate-800">
-                  <p className="text-xs text-gray-500">Platform Fee</p>
+                  <p className="text-xs text-gray-500">{t('checkout.platformFee', 'Platform Fee')}</p>
                   <p className="text-sm font-semibold text-white">₹50</p>
                 </div>
                 <div className="bg-[#0A0D14] p-3 rounded-xl border border-slate-800">
-                  <p className="text-xs text-gray-500">GST (18%)</p>
+                  <p className="text-xs text-gray-500">{t('services.cards.gst', 'GST (18%)')}</p>
                   <p className="text-sm font-semibold text-white">₹{Math.round(selectedService.price * 0.18)}</p>
                 </div>
                 <div className="bg-[#0A0D14] p-3 rounded-xl border border-orange-500/30">
-                  <p className="text-xs text-orange-500">Total Payable</p>
+                  <p className="text-xs text-orange-500">{t('checkout.totalAmount', 'Total Payable')}</p>
                   <p className="text-lg font-bold text-orange-400">₹{selectedService.price + 50 + Math.round(selectedService.price * 0.18)}</p>
                 </div>
               </div>
@@ -523,11 +523,11 @@ export default function ServicesPage() {
                 >
                   {isInCart(selectedService.id) ? (
                     <>
-                      <Trash2 className="w-4 h-4" /> Remove from Cart
+                      <Trash2 className="w-4 h-4" /> {t('checkout.removeFromCart', 'Remove from Cart')}
                     </>
                   ) : (
                     <>
-                      <ShoppingCart className="w-4 h-4" /> Add to Cart
+                      <ShoppingCart className="w-4 h-4" /> {t('checkout.addToCart', 'Add to Cart')}
                     </>
                   )}
                 </button>
@@ -536,7 +536,7 @@ export default function ServicesPage() {
                   onClick={handleCheckout} 
                   className="flex-1 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors text-lg cursor-pointer shadow-lg shadow-orange-500/20"
                 >
-                  Proceed to Checkout <ChevronRight className="w-5 h-5" />
+                  {t('checkout.proceedToCheckout', 'Proceed to Checkout')} <ChevronRight className="w-5 h-5" />
                 </button>
               </div>
             </div>

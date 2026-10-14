@@ -10,6 +10,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { safeFetch } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface MechanicDetails {
   _id?: string;
@@ -52,6 +53,7 @@ type TabType = 'all' | 'active' | 'completed' | 'cancelled';
 
 export default function OrdersPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [orders, setOrders] = useState<OrderItem[]>([]);
@@ -207,7 +209,7 @@ export default function OrdersPage() {
                 <Package className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">My Bookings & Orders</h1>
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">{t('nav.myBookings', 'My Bookings & Orders')}</h1>
                 <p className="text-slate-400 text-sm mt-0.5">
                   Track active mechanic dispatches, review service history, and monitor real road routes.
                 </p>
@@ -231,7 +233,7 @@ export default function OrdersPage() {
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-sm font-bold shadow-lg shadow-orange-500/20 transition-all"
             >
               <Wrench className="w-4 h-4" />
-              <span>Book Assistance</span>
+              <span>{t('services.bookService', 'Book Assistance')}</span>
             </Link>
           </div>
         </div>
@@ -241,7 +243,7 @@ export default function OrdersPage() {
           <form onSubmit={handleQuickTrack} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="flex items-center gap-2 text-slate-300 text-sm font-semibold shrink-0">
               <KeyRound className="w-4 h-4 text-orange-400" />
-              <span>Quick Live Tracker:</span>
+              <span>{t('track.title', 'Live Dispatch Tracking')}:</span>
             </div>
             <div className="relative flex-1">
               <input
@@ -257,7 +259,7 @@ export default function OrdersPage() {
               disabled={!quickTrackCode.trim()}
               className="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white font-bold text-sm transition-all shrink-0 flex items-center justify-center gap-2"
             >
-              <span>Track Now</span>
+              <span>{t('track.title', 'Track Now')}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>

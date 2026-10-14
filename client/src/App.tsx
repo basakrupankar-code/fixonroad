@@ -14,6 +14,7 @@ import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from './context/AuthContext';
 import { LocationProvider, useLocationContext } from './context/LocationContext';
 import { CartProvider } from './context/CartContext';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { useTranslation } from 'react-i18next';
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -93,7 +94,7 @@ function Marquee({ items }: { items: string[] }) {
    LIVE TRACKER WIDGET
 ══════════════════════════════════════════════ */
 function LiveTracker() {
-  const { t } = useTranslation();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [eta, setEta] = useState(12);
   const [distance, setDistance] = useState(2.4);
@@ -139,9 +140,9 @@ function LiveTracker() {
       <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-amber-500/5 pointer-events-none group-hover:from-orange-500/10 group-hover:to-amber-500/10 transition-colors" />
       <div className="relative z-10 space-y-5">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-[17px] group-hover:text-orange-400 transition-colors">{t('home.hero.liveTracker.title', 'Live Dispatch Radar')}</h3>
+          <h3 className="font-bold text-[17px] group-hover:text-orange-400 transition-colors">{t('radar.title', 'Live Dispatch Radar')}</h3>
           <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 1.5 }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" /> {t('home.hero.liveTracker.live', 'Live')}
+            <span className="w-2 h-2 rounded-full bg-emerald-500" /> {t('radar.liveRadar', 'Live')}
           </motion.span>
         </div>
         <div className="rounded-xl overflow-hidden relative h-36" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-primary)" }}>
@@ -160,15 +161,15 @@ function LiveTracker() {
         </div>
         <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-primary)" }}>
           <div>
-            <p className="font-semibold text-[15px]">{status === "searching" ? t('home.hero.liveTracker.searching', 'Finding nearest mechanic…') : partnerName}</p>
-            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>{status === "searching" ? t('home.hero.liveTracker.scanning', 'Scanning 3 km radius') : t('home.hero.liveTracker.eta', '{{distance}} km away · {{eta}} min ETA', { distance, eta })}</p>
+            <p className="font-semibold text-[15px]">{status === "searching" ? t('radar.findingMechanic', 'Finding nearest mechanic…') : partnerName}</p>
+            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>{status === "searching" ? t('radar.scanning', 'Scanning 5 km radius in sector...') : `${distance} km · ${eta} min ETA`}</p>
           </div>
           <div className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide ${status === "searching" ? "bg-yellow-500/15 text-yellow-400" : status === "found" ? "bg-orange-500/15 text-orange-400" : "bg-emerald-500/15 text-emerald-400"}`}>
-            {status === "searching" ? t('home.hero.liveTracker.statusSearching', 'Searching') : status === "found" ? t('home.hero.liveTracker.statusMatched', 'Matched') : t('home.hero.liveTracker.statusEnRoute', 'En Route')}
+            {status === "searching" ? t('radar.searching', 'Searching') : status === "found" ? t('radar.matched', 'Matched') : t('radar.enRoute', 'En Route')}
           </div>
         </div>
         <div className="text-center pt-2">
-          <p className="text-xs text-orange-500/80 font-medium group-hover:text-orange-400 transition-colors">Tap to view live route map &rarr;</p>
+          <p className="text-xs text-orange-500/80 font-medium group-hover:text-orange-400 transition-colors">{t('radar.tapToViewRoute', 'Tap to view live route map →')}</p>
         </div>
       </div>
     </div>
@@ -207,13 +208,13 @@ function CinematicIntro({ onDone }: { onDone: () => void }) {
    RIDER LANDING PAGE
 ══════════════════════════════════════════════ */
 function RiderLanding() {
-  const { t } = useTranslation();
+  const { t } = useLanguage();
   const [introShown, setIntroShown] = useState(false);
   const [introDone, setIntroDone] = useState(false);
   const { address, city, isLocating, fetchLocation } = useLocationContext();
 
   useEffect(() => {
-    document.title = t('home.hero.titleTag', 'FixOnRoad — On-Demand Roadside Help for Bikes & Cars');
+    document.title = t('hero.titleTag', 'FixOnRoad — On-Demand Roadside Help for Bikes & Cars');
     const seen = sessionStorage.getItem("for_intro_seen");
     if (seen) { setIntroDone(true); setIntroShown(true); }
     else { setIntroShown(true); }
@@ -235,10 +236,10 @@ function RiderLanding() {
   const marqueItems = ["Flat Tire Repair", "Jump Start", "Chain Fix", "Engine Diagnosis", "Brake Repair", "Fuel Delivery", "500+ Mechanics", "Fixed Pricing", "Live Tracking", "15 Min Response"];
 
   const breakdownIssues = [
-    { name: t('home.hero.issues.flatTire', 'Flat Tire'), icon: <Droplets className="w-5 h-5 text-blue-400" /> },
-    { name: t('home.hero.issues.deadBattery', 'Dead Battery'), icon: <Battery className="w-5 h-5 text-yellow-400" /> },
-    { name: t('home.hero.issues.chainSnapped', 'Chain Snapped'), icon: <Link2 className="w-5 h-5 text-purple-400" /> },
-    { name: t('home.hero.issues.wontStart', "Won't Start"), icon: <Cog className="w-5 h-5 text-red-400" /> },
+    { name: t('triage.flatTire', 'Flat Tire'), icon: <Droplets className="w-5 h-5 text-blue-400" /> },
+    { name: t('triage.deadBattery', 'Dead Battery'), icon: <Battery className="w-5 h-5 text-yellow-400" /> },
+    { name: t('triage.chainSnapped', 'Chain Snapped'), icon: <Link2 className="w-5 h-5 text-purple-400" /> },
+    { name: t('triage.wontStart', "Won't Start"), icon: <Cog className="w-5 h-5 text-red-400" /> },
   ];
 
   return (
@@ -263,22 +264,22 @@ function RiderLanding() {
           <div className="lg:col-span-7 space-y-7">
             <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: introDone ? 1 : 0, y: introDone ? 0 : 24 }} transition={{ delay: 0.1, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
               <span className="pill-badge">
-                <Zap className="w-3 h-3" /> {t('home.hero.liveIn', 'Live in')} {city.split(',')[0]} <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <Zap className="w-3 h-3" /> {t('hero.badge', `LIVE IN ${city.split(',')[0].toUpperCase()}, WEST BENGAL`)} <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               </span>
             </motion.div>
 
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: introDone ? 1 : 0 }} transition={{ delay: 0.2 }}>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-tight">
-                {t('home.hero.heading1', 'On-Demand')}{" "}
+                {t('hero.heading1', 'On-Demand')}{" "}
                 <span className="text-amber-400 bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent inline-block">
-                  {t('home.hero.heading2', 'Roadside Help')}
+                  {t('hero.heading2', 'Roadside Help')}
                 </span>{" "}
-                {t('home.hero.heading3', 'for Bikes & Cars.')}
+                {t('hero.heading3', 'for Bikes & Cars.')}
               </h1>
             </motion.div>
 
             <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: introDone ? 1 : 0, y: introDone ? 0 : 20 }} transition={{ delay: 0.6, duration: 0.7 }} className="text-base sm:text-lg leading-relaxed text-gray-300">
-              {t('home.hero.subheading', 'Stranded on your vehicle? Request a verified mechanic instantly. Fixed pricing, live tracking, and fast response times.')}
+              {t('hero.subtitle', 'Stranded on your vehicle? Request a verified mechanic instantly. Fixed pricing, live tracking, and fast response times.')}
             </motion.p>
 
             {/* Quick Action Emergency Input */}
@@ -289,15 +290,15 @@ function RiderLanding() {
                 className="flex-1 h-12 bg-white/5 hover:bg-white/10 text-white rounded-xl flex items-center justify-center gap-2 transition-colors border border-white/10"
               >
                 {isLocating ? (
-                  <><span className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" /> {t('home.hero.locating', 'Locating...')}</>
+                  <><span className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" /> {t('hero.locating', 'Locating GPS...')}</>
                 ) : address && address !== 'Detecting location...' ? (
                   <><MapPin className="w-4 h-4 text-emerald-400" /> {city.split(',')[0]}</>
                 ) : (
-                  <><Crosshair className="w-4 h-4 text-orange-400" /> {t('home.hero.useCurrentLocation', 'Use Current Location')}</>
+                  <><Crosshair className="w-4 h-4 text-orange-400" /> {t('hero.useCurrentLocation', 'Use Current Location')}</>
                 )}
               </button>
               <Link to="/services" className="h-12 bg-orange-500 hover:bg-orange-600 text-white px-6 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shrink-0">
-                {t('home.hero.requestHelp', 'Request Help')} <ChevronRight className="w-4 h-4" />
+                {t('hero.requestHelp', 'Request Help')} <ChevronRight className="w-4 h-4" />
               </Link>
             </motion.div>
 
@@ -305,15 +306,15 @@ function RiderLanding() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: introDone ? 1 : 0 }} transition={{ delay: 0.9 }} className="flex flex-wrap gap-6 pt-6 border-t border-orange-500/20">
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-orange-400" />
-                <div className="text-sm"><span className="font-bold text-white">15 min</span><br/><span className="text-gray-400 text-xs">{t('home.hero.avgResponse', 'Avg Response')}</span></div>
+                <div className="text-sm"><span className="font-bold text-white">{t('stats.min15', '15 min')}</span><br/><span className="text-gray-400 text-xs">{t('stats.avgResponse', 'Avg Response')}</span></div>
               </div>
               <div className="flex items-center gap-2">
                 <Wrench className="w-5 h-5 text-orange-400" />
-                <div className="text-sm"><span className="font-bold text-white">500+</span><br/><span className="text-gray-400 text-xs">{t('home.hero.verifiedMechanics', 'Verified Mechanics')}</span></div>
+                <div className="text-sm"><span className="font-bold text-white">{t('stats.count500', '500+')}</span><br/><span className="text-gray-400 text-xs">{t('stats.verifiedMechanics', 'Verified Mechanics')}</span></div>
               </div>
               <div className="flex items-center gap-2">
                 <Star className="w-5 h-5 text-emerald-400 fill-emerald-400" />
-                <div className="text-sm"><span className="font-bold text-white">4.9/5</span><br/><span className="text-gray-400 text-xs">{t('home.hero.userRating', 'User Rating')}</span></div>
+                <div className="text-sm"><span className="font-bold text-white">{t('stats.rating49', '4.9/5')}</span><br/><span className="text-gray-400 text-xs">{t('stats.userRating', 'User Rating')}</span></div>
               </div>
             </motion.div>
           </div>
@@ -332,16 +333,16 @@ function RiderLanding() {
         <div className="px-5 md:px-10 max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <span className="text-xs uppercase tracking-widest text-amber-500 font-semibold bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-              {t('home.hero.triage.badge', 'Instant Assistance')}
+              {t('triage.badge', 'Instant Assistance')}
             </span>
             <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight mt-4">
-              {t('home.hero.triage.heading1', 'What happened to')}{" "}
+              {t('triage.heading1', 'What happened to')}{" "}
               <span className="text-amber-400 bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent inline-block">
-                {t('home.hero.triage.heading2', 'your vehicle?')}
+                {t('triage.heading2', 'your vehicle?')}
               </span>
             </h2>
             <p className="text-gray-400 text-sm sm:text-base mt-2 max-w-md mx-auto">
-              {t('home.hero.triage.subheading', 'Select your issue for transparent, fixed pricing and instant mechanic dispatch.')}
+              {t('triage.subheading', 'Select your issue for transparent, fixed pricing and instant mechanic dispatch.')}
             </p>
           </div>
 
@@ -450,121 +451,123 @@ import AIAssistant from "./components/AIAssistant";
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <LocationProvider>
-        <AuthProvider>
-          <CartProvider>
-          <BrowserRouter>
-            <ScrollToTop />
-            <Toaster 
-              position="top-center" 
-              reverseOrder={false} 
-              toastOptions={{
-                style: {
-                  background: '#1A1D24',
-                  color: '#fff',
-                  border: '1px solid rgba(249,115,22,0.2)',
-                  backdropFilter: 'blur(10px)',
-                },
-                success: {
-                  iconTheme: {
-                    primary: '#10B981',
-                    secondary: '#fff',
+    <LanguageProvider>
+      <ThemeProvider>
+        <LocationProvider>
+          <AuthProvider>
+            <CartProvider>
+            <BrowserRouter>
+              <ScrollToTop />
+              <Toaster 
+                position="top-center" 
+                reverseOrder={false} 
+                toastOptions={{
+                  style: {
+                    background: '#1A1D24',
+                    color: '#fff',
+                    border: '1px solid rgba(249,115,22,0.2)',
+                    backdropFilter: 'blur(10px)',
                   },
-                },
-                error: {
-                  iconTheme: {
-                    primary: '#EF4444',
-                    secondary: '#fff',
+                  success: {
+                    iconTheme: {
+                      primary: '#10B981',
+                      secondary: '#fff',
+                    },
                   },
-                },
-              }}
-            />
-            <Routes>
-              <Route path="/" element={<RiderLanding />} />
-              <Route path="/mechanic" element={<MechanicLanding />} />
-              <Route path="/auth" element={<AuthPage />} />
-              <Route 
-                path="/services" 
-                element={
-                  <ProtectedRoute allowedRoles={['customer']}>
-                    <ServicesPage />
-                  </ProtectedRoute>
-                } 
+                  error: {
+                    iconTheme: {
+                      primary: '#EF4444',
+                      secondary: '#fff',
+                    },
+                  },
+                }}
               />
-              <Route 
-                path="/cart" 
-                element={
-                  <ProtectedRoute allowedRoles={['customer']}>
-                    <CartPage />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/payment" 
-                element={
-                  <ProtectedRoute allowedRoles={['customer']}>
-                    <PaymentPage />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/orders" 
-                element={<OrdersPage />} 
-              />
-              <Route 
-                path="/track/:orderId" 
-                element={<TrackingPage />} 
-              />
-              <Route 
-                path="/profile" 
-                element={
-                  <ProtectedRoute>
-                    <ProfilePage />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route path="/partner/auth" element={<PartnerAuth />} />
-              <Route path="/partner" element={<Navigate to="/partner/auth" replace />} />
-              <Route 
-                path="/mechanic-dashboard" 
-                element={
-                  <ProtectedRoute allowedRoles={['mechanic']}>
-                    <MechanicPortal />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/partner-portal" 
-                element={
-                  <ProtectedRoute allowedRoles={['mechanic']}>
-                    <MechanicPortal />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/partner/portal" 
-                element={
-                  <ProtectedRoute allowedRoles={['mechanic']}>
-                    <MechanicPortal />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/mechanic-portal" 
-                element={
-                  <ProtectedRoute allowedRoles={['mechanic']}>
-                    <MechanicPortal />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-            <AIAssistant />
-          </BrowserRouter>
-          </CartProvider>
-        </AuthProvider>
-      </LocationProvider>
-    </ThemeProvider>
+              <Routes>
+                <Route path="/" element={<RiderLanding />} />
+                <Route path="/mechanic" element={<MechanicLanding />} />
+                <Route path="/auth" element={<AuthPage />} />
+                <Route 
+                  path="/services" 
+                  element={
+                    <ProtectedRoute allowedRoles={['customer']}>
+                      <ServicesPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/cart" 
+                  element={
+                    <ProtectedRoute allowedRoles={['customer']}>
+                      <CartPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/payment" 
+                  element={
+                    <ProtectedRoute allowedRoles={['customer']}>
+                      <PaymentPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/orders" 
+                  element={<OrdersPage />} 
+                />
+                <Route 
+                  path="/track/:orderId" 
+                  element={<TrackingPage />} 
+                />
+                <Route 
+                  path="/profile" 
+                  element={
+                    <ProtectedRoute>
+                      <ProfilePage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route path="/partner/auth" element={<PartnerAuth />} />
+                <Route path="/partner" element={<Navigate to="/partner/auth" replace />} />
+                <Route 
+                  path="/mechanic-dashboard" 
+                  element={
+                    <ProtectedRoute allowedRoles={['mechanic']}>
+                      <MechanicPortal />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/partner-portal" 
+                  element={
+                    <ProtectedRoute allowedRoles={['mechanic']}>
+                      <MechanicPortal />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/partner/portal" 
+                  element={
+                    <ProtectedRoute allowedRoles={['mechanic']}>
+                      <MechanicPortal />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/mechanic-portal" 
+                  element={
+                    <ProtectedRoute allowedRoles={['mechanic']}>
+                      <MechanicPortal />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+              <AIAssistant />
+            </BrowserRouter>
+            </CartProvider>
+          </AuthProvider>
+        </LocationProvider>
+      </ThemeProvider>
+    </LanguageProvider>
   );
 }

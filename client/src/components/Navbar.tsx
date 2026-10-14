@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -9,6 +8,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
+import { useLanguage } from '../context/LanguageContext';
+import LanguageSelector from './LanguageSelector';
 import { safeFetch } from '../lib/api';
 
 // Helper for smooth hash links across pages
@@ -36,7 +37,7 @@ const HashLink = ({ to, children, className, onClick }: any) => {
 
 export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mechanic' }) {
   const { user, isAuthenticated, logout } = useAuth();
-  const { t, i18n } = useTranslation();
+  const { t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const { city, isLocating, fetchLocation, setCity, setAddress } = useLocationContext();
@@ -44,11 +45,9 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
   const [profileOpen, setProfileOpen] = useState<boolean>(false);
-  const [langOpen, setLangOpen] = useState<boolean>(false);
   const [hasActiveOrder, setHasActiveOrder] = useState<boolean>(false);
 
   const profileRef = useRef<HTMLDivElement>(null);
-  const langRef = useRef<HTMLDivElement>(null);
 
   // Sticky navbar shadow and backdrop blur on scroll
   useEffect(() => {
@@ -61,7 +60,6 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
   useEffect(() => {
     setMobileOpen(false);
     setProfileOpen(false);
-    setLangOpen(false);
   }, [location.pathname]);
 
   // Outside click listener for floating dropdowns
@@ -69,9 +67,6 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
     const handleOutsideClick = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setProfileOpen(false);
-      }
-      if (langRef.current && !langRef.current.contains(e.target as Node)) {
-        setLangOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -129,7 +124,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
     { to: '/#how-it-works', label: t('nav.howItWorks', 'How It Works'), isAnchor: true },
     { 
       to: '/orders', 
-      label: 'Track Orders', 
+      label: t('nav.trackOrders', 'Track Orders'), 
       hasPulse: hasActiveOrder 
     },
   ];
@@ -237,14 +232,14 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                 to="/"
                 className="px-3.5 py-1.5 rounded-full border border-slate-700 hover:border-orange-500/50 bg-white/[0.02] text-xs font-semibold text-slate-300 hover:text-white transition-all"
               >
-                Switch to Rider
+                {t('nav.switchToRider', 'Switch to Rider')}
               </Link>
             ) : (
               <Link
                 to="/mechanic"
                 className="px-3.5 py-1.5 rounded-full border border-orange-500/30 hover:border-orange-500 bg-orange-500/5 hover:bg-orange-500/10 text-xs font-semibold text-orange-400 hover:text-orange-300 transition-all shadow-sm"
               >
-                For Mechanics
+                {t('nav.forMechanics', 'For Mechanics')}
               </Link>
             )}
           </nav>
@@ -254,50 +249,8 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
           {/* ========================================================= */}
           <div className="flex items-center gap-3">
             
-            {/* Language Selector Dropdown */}
-            <div className="relative" ref={langRef}>
-              <button
-                onClick={() => setLangOpen(!langOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition-all"
-                aria-label="Select Language"
-              >
-                <Globe className="w-3.5 h-3.5 text-slate-400" />
-                <span className="uppercase">{i18n.language || 'en'}</span>
-                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${langOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              <AnimatePresence>
-                {langOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full mt-2 w-36 py-1.5 rounded-2xl bg-[#121824] border border-slate-800 shadow-2xl shadow-black/80 z-50 backdrop-blur-xl"
-                  >
-                    {[
-                      { code: 'en', label: 'English' },
-                      { code: 'bn', label: 'বাংলা (Bengali)' },
-                      { code: 'hi', label: 'हिंदी (Hindi)' }
-                    ].map((item) => (
-                      <button
-                        key={item.code}
-                        onClick={() => {
-                          i18n.changeLanguage(item.code);
-                          setLangOpen(false);
-                        }}
-                        className={`w-full text-left px-3.5 py-2 text-xs font-semibold flex items-center justify-between hover:bg-white/[0.06] transition-colors ${
-                          i18n.language === item.code ? 'text-orange-400 font-bold' : 'text-slate-300'
-                        }`}
-                      >
-                        <span>{item.label}</span>
-                        {i18n.language === item.code && <Check className="w-3.5 h-3.5 text-orange-400" />}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            {/* Interactive Language Selector Dropdown */}
+            <LanguageSelector variant="navbar" />
 
             {/* Logged Out State: Sign In + Emergency CTA */}
             {!isAuthenticated ? (
@@ -306,7 +259,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   to={isMechanic ? '/partner/auth' : '/auth'}
                   className="text-xs font-bold text-slate-300 hover:text-white px-3 py-2 transition-colors"
                 >
-                  {isMechanic ? 'Partner Login' : 'Sign In'}
+                  {isMechanic ? t('nav.partnerLogin', 'Partner Login') : t('nav.signIn', 'Sign In')}
                 </Link>
 
                 <Link
@@ -314,7 +267,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 hover:scale-[1.02] transition-all"
                 >
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>Emergency Help</span>
+                  <span>{t('nav.emergencyHelp', 'Emergency Help')}</span>
                 </Link>
               </div>
             ) : (
@@ -327,7 +280,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                     className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 transition-all hover:scale-[1.02]"
                   >
                     <AlertTriangle className="w-3.5 h-3.5" />
-                    <span>Emergency Help</span>
+                    <span>{t('nav.emergencyHelp', 'Emergency Help')}</span>
                   </Link>
                 )}
 
@@ -388,7 +341,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                           >
                             <span className="flex items-center gap-2.5">
                               <Package className="w-4 h-4 text-orange-400" />
-                              <span>My Bookings & Orders</span>
+                              <span>{t('nav.myBookings', 'My Bookings')}</span>
                             </span>
                             {hasActiveOrder && (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30 animate-pulse">
@@ -403,7 +356,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors"
                           >
                             <UserIcon className="w-4 h-4 text-slate-400" />
-                            <span>Profile & Account Settings</span>
+                            <span>{t('nav.myProfile', 'Profile & Account Settings')}</span>
                           </Link>
 
                           {user?.role === 'mechanic' && (
@@ -442,7 +395,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
                         >
                           <LogOut className="w-4 h-4 text-red-400" />
-                          <span>Sign Out</span>
+                          <span>{t('nav.logout', 'Sign Out')}</span>
                         </button>
                       </motion.div>
                     )}
@@ -535,15 +488,18 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   </div>
                 )}
 
+                {/* Language Selector for Mobile Drawer */}
+                <LanguageSelector variant="drawer" className="mt-4 mb-2" />
+
                 {/* Mobile Links */}
-                <div className="mt-6 space-y-2">
+                <div className="mt-5 space-y-2">
                   <Link
                     to="/services"
                     onClick={() => setMobileOpen(false)}
                     className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/[0.05] transition-colors"
                   >
                     <Wrench className="w-4 h-4 text-orange-400" />
-                    <span>Roadside Services</span>
+                    <span>{t('nav.services', 'Roadside Services')}</span>
                   </Link>
 
                   <HashLink
@@ -552,7 +508,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                     className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/[0.05] transition-colors"
                   >
                     <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span>How It Works</span>
+                    <span>{t('nav.howItWorks', 'How It Works')}</span>
                   </HashLink>
 
                   <Link
@@ -562,7 +518,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   >
                     <div className="flex items-center gap-3">
                       <Package className="w-4 h-4 text-orange-400" />
-                      <span>Track Bookings & Orders</span>
+                      <span>{t('nav.trackOrders', 'Track Bookings & Orders')}</span>
                     </div>
                     {hasActiveOrder && (
                       <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
@@ -576,7 +532,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                       className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/[0.05] transition-colors"
                     >
                       <UserIcon className="w-4 h-4 text-slate-400" />
-                      <span>Account Settings</span>
+                      <span>{t('nav.myProfile', 'Account Settings')}</span>
                     </Link>
                   )}
 
@@ -587,7 +543,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                       className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-slate-300 hover:bg-white/[0.05]"
                     >
                       <Navigation className="w-4 h-4 text-slate-400" />
-                      <span>Switch to Driver/Rider</span>
+                      <span>{t('nav.switchToRider', 'Switch to Driver/Rider')}</span>
                     </Link>
                   ) : (
                     <Link
@@ -596,7 +552,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                       className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-orange-400 hover:bg-orange-500/10"
                     >
                       <ShieldCheck className="w-4 h-4 text-orange-400" />
-                      <span>Partner Portal (For Mechanics)</span>
+                      <span>{t('nav.forMechanics', 'Partner Portal (For Mechanics)')}</span>
                     </Link>
                   )}
                 </div>
@@ -609,7 +565,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition-all"
                 >
                   <PhoneCall className="w-4 h-4" />
-                  <span>Call Emergency Dispatch (24/7)</span>
+                  <span>{t('nav.emergencyHelp', 'Call Emergency Dispatch (24/7)')}</span>
                 </a>
 
                 {isAuthenticated ? (
@@ -621,7 +577,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                     className="w-full py-2.5 rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 border border-red-500/20 transition-all flex items-center justify-center gap-2"
                   >
                     <LogOut className="w-4 h-4" />
-                    <span>Sign Out</span>
+                    <span>{t('nav.logout', 'Sign Out')}</span>
                   </button>
                 ) : (
                   <Link
@@ -629,7 +585,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                     onClick={() => setMobileOpen(false)}
                     className="w-full block py-3 rounded-xl text-center text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/30 transition-all"
                   >
-                    Sign In to FixOnRoad
+                    {t('nav.signIn', 'Sign In to FixOnRoad')}
                   </Link>
                 )}
               </div>

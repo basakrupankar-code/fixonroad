@@ -2,33 +2,33 @@ import { motion } from 'framer-motion';
 import { MapPin, Wrench, Smartphone, Banknote, ArrowRight } from 'lucide-react';
 import { useInView } from 'framer-motion';
 import { useRef } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function HowItWorks() {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: '-100px' });
-  const { t } = useTranslation();
+  const { t } = useLanguage();
 
   const steps = [
     {
       icon: <MapPin className="w-8 h-8 text-orange-400" />,
-      title: t('home.howItWorks.step1.title', 'Pin Your Location'),
-      description: t('home.howItWorks.step1.desc', 'Instant auto-detection or manual landmark selection in Kalyani / West Bengal.'),
+      title: t('howItWorks.step1Title', 'Pin Your Location'),
+      description: t('howItWorks.step1Desc', 'Instant auto-detection or manual landmark selection in Kalyani / West Bengal.'),
     },
     {
       icon: <Wrench className="w-8 h-8 text-amber-400" />,
-      title: t('home.howItWorks.step2.title', 'Select Issue & Get Price'),
-      description: t('home.howItWorks.step2.desc', 'Choose flat tire, jump start, chain, or towing. Transparent upfront pricing with no hidden charges.'),
+      title: t('howItWorks.step2Title', 'Select Issue & Get Price'),
+      description: t('howItWorks.step2Desc', 'Choose flat tire, jump start, chain, or towing. Transparent upfront pricing with no hidden charges.'),
     },
     {
       icon: <Smartphone className="w-8 h-8 text-emerald-400" />,
-      title: t('home.howItWorks.step3.title', 'Mechanic Dispatched'),
-      description: t('home.howItWorks.step3.desc', 'Live GPS tracking as your verified technician arrives in minutes with the right tools.'),
+      title: t('howItWorks.step3Title', 'Mechanic Dispatched'),
+      description: t('howItWorks.step3Desc', 'Live GPS tracking as your verified technician arrives in minutes with the right tools.'),
     },
     {
       icon: <Banknote className="w-8 h-8 text-blue-400" />,
-      title: t('home.howItWorks.step4.title', 'Pay Digitally or Cash'),
-      description: t('home.howItWorks.step4.desc', 'Inspect the fix and pay seamlessly via UPI (GPay/PhonePe/Paytm) or cash.'),
+      title: t('howItWorks.step4Title', 'Pay Digitally or Cash'),
+      description: t('howItWorks.step4Desc', 'Inspect the fix and pay seamlessly via UPI (GPay/PhonePe/Paytm) or cash.'),
     },
   ];
 
@@ -37,10 +37,13 @@ export default function HowItWorks() {
       <div className="max-w-7xl mx-auto px-5 md:px-10">
         <div className="text-center mb-16">
           <span className="text-xs uppercase tracking-widest text-amber-500 font-semibold bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-            {t('home.howItWorks.badge', 'How It Works')}
+            {t('howItWorks.badge', 'HOW IT WORKS')}
           </span>
           <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight mt-4">
-            {t('home.howItWorks.heading1', 'Roadside Help in')} <span className="text-amber-400 bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">{t('home.howItWorks.heading2', '4 Simple Steps')}</span>
+            {t('howItWorks.heading1', 'Roadside Help in')}{' '}
+            <span className="text-amber-400 bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
+              {t('howItWorks.heading2', '4 Simple Steps')}
+            </span>
           </h2>
         </div>
 
