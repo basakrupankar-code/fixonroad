@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import { Order } from '../models/Order';
+import { Mechanic } from '../models/Mechanic';
 import { requireAuth } from '../middleware/auth';
+import { calculateHaversineDistanceKm, isValidCoordinate, formatDistance } from '../utils/distance';
 
 const router = Router();
 
-// Used by Mechanic Portal to fetch their jobs
+// Used by Mechanic Portal to fetch their jobs with live distance calculation
 router.get('/mechanic-jobs', requireAuth, async (req: any, res: any, next) => {
   try {
     const user = req.user;
@@ -13,7 +15,33 @@ router.get('/mechanic-jobs', requireAuth, async (req: any, res: any, next) => {
       return res.status(403).json({ error: { message: 'Only mechanics can fetch jobs' } });
     }
 
-    // Get unassigned (PENDING) jobs or jobs assigned to this mechanic
+    // 1. Resolve mechanic location: check query parameters first, then profile database
+    let mechLat: number | null = null;
+    let mechLng: number | null = null;
+
+    if (req.query.lat && req.query.lng) {
+      const qLat = Number(req.query.lat);
+      const qLng = Number(req.query.lng);
+      if (isValidCoordinate(qLat, qLng)) {
+        mechLat = qLat;
+        mechLng = qLng;
+
+        // Asynchronously update mechanic profile with latest live location if valid
+        Mechanic.findByIdAndUpdate(user._id, {
+          $set: { currentLocation: { lat: qLat, lng: qLng } }
+        }).catch(err => console.error('Failed to update live mechanic location:', err));
+      }
+    }
+
+    if (mechLat === null || mechLng === null) {
+      const mechDoc = await Mechanic.findById(user._id).select('currentLocation');
+      if (mechDoc?.currentLocation && isValidCoordinate(mechDoc.currentLocation.lat, mechDoc.currentLocation.lng)) {
+        mechLat = mechDoc.currentLocation.lat;
+        mechLng = mechDoc.currentLocation.lng;
+      }
+    }
+
+    // 2. Get unassigned (PENDING) jobs or jobs assigned to this mechanic
     const jobs = await Order.find({
       $or: [
         { status: 'PENDING' },
@@ -21,18 +49,163 @@ router.get('/mechanic-jobs', requireAuth, async (req: any, res: any, next) => {
       ]
     }).populate('userId', 'name phone').sort({ createdAt: -1 });
 
-    const formattedJobs = jobs.map((job: any) => ({
-      id: job._id,
-      type: job.serviceDetails.serviceType,
-      customerName: job.userId?.name || 'Unknown',
-      location: job.location.address,
-      distance: 'Unknown km', // We can calculate this if needed
-      price: job.serviceDetails.totalAmount,
-      status: job.status,
-      time: job.createdAt
-    }));
+    const formattedJobs = jobs.map((job: any) => {
+      const jobLat = job.location?.lat;
+      const jobLng = job.location?.lng;
+      let distanceKm: number | null = null;
+
+      if (isValidCoordinate(mechLat, mechLng) && isValidCoordinate(jobLat, jobLng)) {
+        distanceKm = calculateHaversineDistanceKm(
+          { lat: mechLat!, lng: mechLng! },
+          { lat: jobLat, lng: jobLng }
+        );
+      }
+
+      return {
+        id: job._id,
+        type: job.serviceDetails?.serviceType || 'Roadside Assistance',
+        customerName: job.userId?.name || 'Customer in Need',
+        customerPhone: job.userId?.phone || null,
+        location: job.location?.address || 'Roadside Location',
+        coordinates: {
+          lat: typeof jobLat === 'number' ? jobLat : null,
+          lng: typeof jobLng === 'number' ? jobLng : null
+        },
+        distanceKm: distanceKm,
+        distance: formatDistance(distanceKm),
+        price: Number(job.serviceDetails?.totalAmount || 0),
+        basePrice: Number(job.serviceDetails?.basePrice || 0),
+        gst: Number(job.serviceDetails?.gst || 0),
+        platformFee: Number(job.serviceDetails?.platformFee || 0),
+        status: job.status,
+        time: job.createdAt
+      };
+    });
 
     res.json({ jobs: formattedJobs });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Used by Mechanic Portal to fetch aggregated earnings & recent payouts
+router.get('/mechanic-earnings', requireAuth, async (req: any, res: any, next) => {
+  try {
+    const user = req.user;
+    if (user.role !== 'mechanic') {
+      return res.status(403).json({ error: { message: 'Only mechanics can fetch earnings' } });
+    }
+
+    const mechanicObjId = new mongoose.Types.ObjectId(user._id);
+
+    // Compute Indian Standard Time / local date boundaries
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // MongoDB aggregation pipeline for completed/paid job amounts
+    const aggregation = await Order.aggregate([
+      {
+        $match: {
+          mechanicId: { $in: [mechanicObjId, user._id.toString()] },
+          status: { $in: ['COMPLETED', 'PAID'] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          lifetimeEarnings: { $sum: '$serviceDetails.totalAmount' },
+          totalCompletedJobs: { $sum: 1 },
+          todayEarnings: {
+            $sum: {
+              $cond: [{ $gte: ['$createdAt', startOfToday] }, '$serviceDetails.totalAmount', 0]
+            }
+          },
+          todayJobs: {
+            $sum: {
+              $cond: [{ $gte: ['$createdAt', startOfToday] }, 1, 0]
+            }
+          },
+          weekEarnings: {
+            $sum: {
+              $cond: [{ $gte: ['$createdAt', startOfWeek] }, '$serviceDetails.totalAmount', 0]
+            }
+          },
+          weekJobs: {
+            $sum: {
+              $cond: [{ $gte: ['$createdAt', startOfWeek] }, 1, 0]
+            }
+          },
+          monthEarnings: {
+            $sum: {
+              $cond: [{ $gte: ['$createdAt', startOfMonth] }, '$serviceDetails.totalAmount', 0]
+            }
+          },
+          monthJobs: {
+            $sum: {
+              $cond: [{ $gte: ['$createdAt', startOfMonth] }, 1, 0]
+            }
+          }
+        }
+      }
+    ]);
+
+    // Active in-progress jobs calculation
+    const activeJobs = await Order.find({
+      mechanicId: { $in: [mechanicObjId, user._id.toString()] },
+      status: { $in: ['MECHANIC_ASSIGNED', 'EN_ROUTE', 'ARRIVED'] }
+    }).select('serviceDetails.totalAmount');
+
+    const activeJobsCount = activeJobs.length;
+    const activeEarnings = activeJobs.reduce((sum, j) => sum + Number(j.serviceDetails?.totalAmount || 0), 0);
+
+    // Recent payouts list
+    const recentOrders = await Order.find({
+      mechanicId: { $in: [mechanicObjId, user._id.toString()] },
+      status: { $in: ['COMPLETED', 'PAID'] }
+    })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(10)
+      .populate('userId', 'name phone');
+
+    const recentPayouts = recentOrders.map((o: any) => ({
+      id: o._id,
+      serviceType: o.serviceDetails?.serviceType || 'Roadside Assistance',
+      customerName: o.userId?.name || 'Customer',
+      amount: Number(o.serviceDetails?.totalAmount || 0),
+      basePrice: Number(o.serviceDetails?.basePrice || 0),
+      date: o.updatedAt || o.createdAt,
+      paymentMethod: o.paymentMethod || 'UPI',
+      status: o.status
+    }));
+
+    const stats = aggregation[0] || {
+      lifetimeEarnings: 0,
+      totalCompletedJobs: 0,
+      todayEarnings: 0,
+      todayJobs: 0,
+      weekEarnings: 0,
+      weekJobs: 0,
+      monthEarnings: 0,
+      monthJobs: 0
+    };
+
+    res.json({
+      earnings: {
+        today: Math.round(Number(stats.todayEarnings) || 0),
+        todayJobs: Number(stats.todayJobs) || 0,
+        week: Math.round(Number(stats.weekEarnings) || 0),
+        weekJobs: Number(stats.weekJobs) || 0,
+        month: Math.round(Number(stats.monthEarnings) || 0),
+        monthJobs: Number(stats.monthJobs) || 0,
+        lifetime: Math.round(Number(stats.lifetimeEarnings) || 0),
+        completedJobs: Number(stats.totalCompletedJobs) || 0,
+        activeJobs: activeJobsCount,
+        activeEarnings: Math.round(activeEarnings)
+      },
+      recentPayouts
+    });
   } catch (error) {
     next(error);
   }

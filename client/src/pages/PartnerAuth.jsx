@@ -21,7 +21,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { signInWithPopup } from 'firebase/auth';
-import { auth as firebaseAuth, googleProvider } from '../lib/firebase';
+import { auth as firebaseAuth, googleProvider, isFirebaseConfigured, getFirebaseErrorMessage } from '../lib/firebase';
 import { PasswordPolicy } from '../components/PasswordPolicy';
 import toast from 'react-hot-toast';
 import { safeFetch } from '../lib/api';
@@ -140,6 +140,7 @@ export default function PartnerAuth() {
         age: parseInt(registerData.age, 10) || 25,
         vehiclePlate: registerData.vehiclePlate || 'WB 00 AP 0000',
         upiId: registerData.upiId || `${cleanPhone}@upi`,
+        currentLocation: registerData.currentLocation || { lat: 22.9772, lng: 88.4312 },
         acceptedCookies: true,
         role: 'mechanic'
       };
@@ -165,37 +166,64 @@ export default function PartnerAuth() {
     }
   };
 
-  const handleDetectLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser');
-      return;
-    }
-
+  const handleDetectLocation = async () => {
     setIsLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const geofenceLoc = resolveGeofenceLocation(latitude, longitude);
-          if (geofenceLoc.city) {
-            setRegisterData(prev => ({ ...prev, city: geofenceLoc.city }));
-            toast.success(`Geofence hub detected: ${geofenceLoc.city}`);
-          } else {
-            toast.error('Could not detect city automatically');
-          }
-        } catch (_err) {
-          toast.error('Failed to fetch location data');
-        } finally {
-          setIsLoading(false);
+
+    const getGpsPosition = () =>
+      new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          return reject(new Error('UNSUPPORTED'));
         }
-      },
-      (_err) => {
-        const fallback = resolveGeofenceLocation(22.9772, 88.4312);
-        setRegisterData(prev => ({ ...prev, city: fallback.city }));
-        toast(`Defaulted to service hub: ${fallback.city}`, { icon: '📍' });
-        setIsLoading(false);
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000
+        });
+      });
+
+    try {
+      const position = await getGpsPosition();
+      const { latitude, longitude } = position.coords;
+      const geofenceLoc = resolveGeofenceLocation(latitude, longitude);
+      setRegisterData(prev => ({
+        ...prev,
+        city: geofenceLoc.city || prev.city,
+        currentLocation: { lat: latitude, lng: longitude }
+      }));
+      toast.success(`GPS Hub detected: ${geofenceLoc.city || 'Coordinates saved'} (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`);
+    } catch (geoErr) {
+      console.warn('GPS location failed or denied, trying network IP location:', geoErr);
+
+      // IP fallback
+      try {
+        const ipRes = await fetch('https://ipwho.is/');
+        const ipData = await ipRes.json();
+        if (ipData.success && ipData.latitude && ipData.longitude) {
+          const geofenceLoc = resolveGeofenceLocation(ipData.latitude, ipData.longitude);
+          setRegisterData(prev => ({
+            ...prev,
+            city: geofenceLoc.city || ipData.city || prev.city,
+            currentLocation: { lat: ipData.latitude, lng: ipData.longitude }
+          }));
+          toast(`Location set from network: ${ipData.city || geofenceLoc.city}`, { icon: '🌐' });
+          setIsLoading(false);
+          return;
+        }
+      } catch (ipErr) {
+        console.warn('IP fallback failed:', ipErr);
       }
-    );
+
+      // Final default service hub fallback
+      const fallback = resolveGeofenceLocation(22.9772, 88.4312);
+      setRegisterData(prev => ({
+        ...prev,
+        city: fallback.city,
+        currentLocation: { lat: 22.9772, lng: 88.4312 }
+      }));
+      toast(`Defaulted to primary service hub: ${fallback.city}`, { icon: '📍' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGeneratePassword = () => {
@@ -222,8 +250,8 @@ export default function PartnerAuth() {
   };
 
   const handleGoogleLogin = async () => {
-    if (!firebaseAuth || (!firebaseAuth.app && Object.keys(firebaseAuth).length === 0)) {
-      toast.error('Firebase is not configured! Please check your VITE_FIREBASE_* credentials.');
+    if (!isFirebaseConfigured() || !firebaseAuth) {
+      toast.error('Firebase is not configured! Please check your VITE_FIREBASE_* credentials in .env or Vercel settings.');
       return;
     }
 
@@ -244,8 +272,13 @@ export default function PartnerAuth() {
       // Navigate to partner dashboard
       navigate('/mechanic-dashboard');
     } catch (err) {
-      console.error(err);
-      toast.error(err.message || 'Google sign in failed.');
+      console.error('Partner Google Login Error:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        toast('Google sign-in popup was closed.', { icon: 'ℹ️' });
+      } else {
+        const readableMsg = getFirebaseErrorMessage(err);
+        toast.error(readableMsg);
+      }
     } finally {
       setIsLoading(false);
     }

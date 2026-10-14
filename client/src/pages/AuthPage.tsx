@@ -5,7 +5,7 @@ import { Wrench, ArrowRight, ChevronLeft, CarFront, Mail, User as UserIcon, MapP
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { signInWithPopup } from 'firebase/auth';
-import { auth as firebaseAuth, googleProvider } from '../lib/firebase';
+import { auth as firebaseAuth, googleProvider, isFirebaseConfigured, getFirebaseErrorMessage } from '../lib/firebase';
 import { PasswordPolicy } from '../components/PasswordPolicy';
 import toast from 'react-hot-toast';
 import { safeFetch } from '../lib/api';
@@ -174,8 +174,8 @@ export default function AuthPage() {
   };
 
   const handleGoogleLogin = async () => {
-    if (!firebaseAuth || (!firebaseAuth.app && Object.keys(firebaseAuth).length === 0)) {
-      toast.error('Firebase is not configured! Please check your VITE_FIREBASE_* credentials.');
+    if (!isFirebaseConfigured() || !firebaseAuth) {
+      toast.error('Firebase is not configured! Please check your VITE_FIREBASE_* credentials in .env or Vercel settings.');
       return;
     }
 
@@ -201,8 +201,13 @@ export default function AuthPage() {
         navigate('/services');
       }
     } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || 'Google sign in failed. Is your Firebase .env configured?');
+      console.error('Customer Google Login Error:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        toast('Google sign-in popup was closed.', { icon: 'ℹ️' });
+      } else {
+        const readableMsg = getFirebaseErrorMessage(err);
+        toast.error(readableMsg);
+      }
     } finally {
       setIsLoading(false);
     }
