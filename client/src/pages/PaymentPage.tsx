@@ -45,6 +45,7 @@ export default function PaymentPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentDone, setPaymentDone] = useState(false);
   const [confirmedOrderId, setConfirmedOrderId] = useState<string>('');
+  const [confirmedOrderCode, setConfirmedOrderCode] = useState<string>('');
   const [confirmedPaymentId, setConfirmedPaymentId] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,12 +92,14 @@ export default function PaymentPage() {
 
       const orderData = resData.data || resData;
       const targetOrderId = orderData.orderId || orderData._id || '6ac8e7e0a6f24ff6530cc8a0';
+      const targetOrderCode = orderData.orderCode || (targetOrderId ? `FOR-${targetOrderId.slice(0, 6).toUpperCase()}` : 'FOR-PENDING');
       setConfirmedOrderId(targetOrderId);
+      setConfirmedOrderCode(targetOrderCode);
 
-      // 2. If Cash on Delivery, redirect straight to tracking
+      // 2. If Cash on Delivery, show confirmation screen with immediate dispatch tracking & order history
       if (method === 'cod') {
         clearCart();
-        navigate(`/track/${targetOrderId}`);
+        setPaymentDone(true);
         return;
       }
 
@@ -187,7 +190,7 @@ export default function PaymentPage() {
   };
 
   const copyOrderId = () => {
-    navigator.clipboard.writeText(confirmedOrderId || 'FIX-2026-00847');
+    navigator.clipboard.writeText(confirmedOrderCode || confirmedOrderId || 'FOR-ORDER');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -228,8 +231,8 @@ export default function PaymentPage() {
               </div>
               <div className="flex justify-between text-[15px] items-center">
                 <span style={{ color: 'var(--text-muted)' }}>{t('payment.success.orderId')}</span>
-                <span className="flex items-center gap-1.5 font-mono text-xs">
-                  {confirmedOrderId || 'FIX-2026-00847'}
+                <span className="flex items-center gap-1.5 font-mono text-xs font-bold text-orange-400">
+                  {confirmedOrderCode || confirmedOrderId || 'FOR-ORDER'}
                   <button onClick={copyOrderId} className="transition-colors hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
                     {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
@@ -255,12 +258,21 @@ export default function PaymentPage() {
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
-                onClick={() => navigate(`/track/${confirmedOrderId || '6ac8e7e0a6f24ff6530cc8a0'}`)}
+                onClick={() => navigate(`/track/${confirmedOrderCode || confirmedOrderId || '6ac8e7e0a6f24ff6530cc8a0'}`)}
                 className="btn-primary flex-1 py-3 text-center"
               >
                 Track Mechanic Live
               </button>
-              <Link to="/" className="px-5 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-medium transition-colors text-center">
+              <button
+                type="button"
+                onClick={() => navigate('/orders')}
+                className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-semibold transition-colors text-center text-white border border-slate-700"
+              >
+                View My Bookings
+              </button>
+            </div>
+            <div className="mt-4">
+              <Link to="/" className="text-xs text-slate-400 hover:text-white transition-colors block text-center">
                 {t('payment.success.backToHome')}
               </Link>
             </div>

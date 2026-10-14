@@ -12,6 +12,8 @@ export const setupRoutes = (app: Application) => {
   app.use('/api/v1/services', servicesRouter);
   app.use('/api/v1/mechanics', mechanicsRouter);
   app.use('/api/v1/bookings', bookingsRouter);
+  app.use('/api/v1/orders', bookingsRouter);
+  app.use('/api/orders', bookingsRouter);
   app.use('/api/v1/payments', paymentsRouter);
   app.use('/api/v1/reviews', reviewsRouter);
   app.use('/api/v1/me', meRouter);

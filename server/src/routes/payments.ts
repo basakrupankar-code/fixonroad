@@ -5,6 +5,8 @@ import { Order } from '../models/Order';
 import { User } from '../models/User';
 import { z } from 'zod';
 import { assignRandomAvailableMechanic } from '../utils/mechanicAssignment';
+import { generateOrderCode } from '../utils/orderCode';
+import { getRoadRoute } from '../utils/routing';
 
 const router = Router();
 
@@ -143,8 +145,21 @@ router.post('/create-order', requireAuth, async (req, res, next) => {
         assignedMechanicId = assignedMech._id;
       }
 
+      // Compute actual road network route & two-wheeler ETA via OSRM
+      const originCoords = {
+        lat: assignedMech?.currentLocation?.lat || 22.9772,
+        lng: assignedMech?.currentLocation?.lng || 88.4312
+      };
+      const destCoords = {
+        lat: parsed.location?.lat || 23.3644,
+        lng: parsed.location?.lng || 88.3182
+      };
+      const routeData = await getRoadRoute(originCoords, destCoords);
+
+      const orderCode = generateOrderCode();
       order = await Order.create({
         userId: effectiveUserId,
+        orderCode,
         mechanicId: assignedMechanicId,
         serviceDetails: {
           serviceType: parsed.serviceType,
@@ -156,12 +171,12 @@ router.post('/create-order', requireAuth, async (req, res, next) => {
         location: parsed.location,
         paymentMethod: parsed.paymentMethod,
         status: parsed.paymentMethod === 'cod' ? (assignedMechanicId ? 'CONFIRMED' : 'PENDING') : 'PENDING',
+        roadDistanceKm: routeData.distanceKm,
+        estimatedDurationMin: routeData.durationMinutes,
+        routePolyline: routeData.coordinates,
+        routingEngine: routeData.source,
         expiresAt
       });
-
-      if (req.user?.userId) {
-        await User.findByIdAndUpdate(req.user.userId, { activeOrderId: order._id });
-      }
     }
 
     // Cash on Delivery

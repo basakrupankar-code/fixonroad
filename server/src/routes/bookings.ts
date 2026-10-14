@@ -5,6 +5,8 @@ import { Mechanic } from '../models/Mechanic';
 import { requireAuth } from '../middleware/auth';
 import { calculateHaversineDistanceKm, isValidCoordinate, formatDistance } from '../utils/distance';
 import { assignRandomAvailableMechanic } from '../utils/mechanicAssignment';
+import { generateOrderCode } from '../utils/orderCode';
+import { getRoadRoute } from '../utils/routing';
 
 const router = Router();
 
@@ -214,25 +216,48 @@ router.get('/mechanic-earnings', requireAuth, async (req: any, res: any, next) =
 
 router.post('/', requireAuth, async (req: any, res: any, next) => {
   try {
-    let { mechanicId, serviceDetails, location } = req.body;
+    let { mechanicId, serviceDetails, location, paymentMethod } = req.body;
     
-    // If mechanicId is not provided, auto-assign from available mechanics
-    if (!mechanicId) {
-      const assignedMech = await assignRandomAvailableMechanic({
+    let assignedMechanicDoc: any = null;
+    // 1. If mechanicId is provided, fetch the mechanic; otherwise auto-assign
+    if (mechanicId && mongoose.Types.ObjectId.isValid(mechanicId)) {
+      assignedMechanicDoc = await Mechanic.findById(mechanicId);
+    } else {
+      assignedMechanicDoc = await assignRandomAvailableMechanic({
         location: location ? { lat: location.lat, lng: location.lng } : null,
         serviceType: serviceDetails?.serviceType
       });
-      if (assignedMech) {
-        mechanicId = assignedMech._id;
+      if (assignedMechanicDoc) {
+        mechanicId = assignedMechanicDoc._id;
       }
     }
 
+    // 2. Compute real road network route & two-wheeler ETA via OSRM
+    const originCoords = {
+      lat: assignedMechanicDoc?.currentLocation?.lat || 22.9772,
+      lng: assignedMechanicDoc?.currentLocation?.lng || 88.4312
+    };
+    const destCoords = {
+      lat: location?.lat || 23.3644,
+      lng: location?.lng || 88.3182
+    };
+
+    const routeData = await getRoadRoute(originCoords, destCoords);
+
+    // 3. Create unique order with human-readable tracking code
+    const orderCode = generateOrderCode();
     const newOrder = await Order.create({
       userId: req.user._id,
+      orderCode,
       mechanicId,
       serviceDetails,
       location,
+      paymentMethod: paymentMethod || 'cod',
       status: mechanicId ? 'CONFIRMED' : 'PENDING',
+      roadDistanceKm: routeData.distanceKm,
+      estimatedDurationMin: routeData.durationMinutes,
+      routePolyline: routeData.coordinates,
+      routingEngine: routeData.source,
       expiresAt: new Date(Date.now() + 600000) // expires in 10 mins
     });
 
@@ -258,8 +283,11 @@ router.get('/', requireAuth, async (req: any, res: any, next) => {
       query.status = status;
     }
     
-    const bookings = await Order.find(query).sort({ createdAt: -1 });
-    res.json({ bookings });
+    const orders = await Order.find(query)
+      .populate('mechanicId', 'name workshopName specialization serviceCategories vehiclePlate phone rating currentLocation')
+      .sort({ createdAt: -1 });
+
+    res.json({ bookings: orders, orders });
   } catch (error) {
     next(error);
   }
@@ -269,16 +297,16 @@ router.get('/:id', requireAuth, async (req: any, res: any, next) => {
   try {
     const { id } = req.params;
     
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({ error: { message: 'Booking not found or invalid ID format' } });
-    }
+    // Support lookup by either MongoDB ObjectId or human-readable orderCode (e.g. FOR-XXXXXX)
+    const isObjectId = mongoose.Types.ObjectId.isValid(id);
+    const query = isObjectId ? { _id: id } : { orderCode: id.toUpperCase() };
 
-    const booking = await Order.findById(id).populate('mechanicId');
+    let booking = await Order.findOne(query).populate('mechanicId');
     if (!booking) {
       return res.status(404).json({ error: { message: 'Booking not found' } });
     }
 
-    // BOLA / IDOR Verification: only the booking customer or assigned mechanic can view
+    // BOLA / IDOR Verification: only the booking customer or assigned mechanic or admin can view
     const currentUserId = req.user.userId || req.user._id.toString();
     const isCustomer = booking.userId.toString() === currentUserId;
     const assignedMechId = (booking.mechanicId as any)?._id?.toString() || booking.mechanicId?.toString();
@@ -288,11 +316,30 @@ router.get('/:id', requireAuth, async (req: any, res: any, next) => {
       return res.status(403).json({ error: { message: 'Forbidden. You do not have permission to view this booking.' } });
     }
 
+    // If routePolyline is missing on existing order, dynamically compute & backfill it
+    if (!booking.routePolyline || booking.routePolyline.length === 0) {
+      const mechLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.9772, lng: 88.4312 };
+      const destLocation = booking.location || { lat: 23.3644, lng: 88.3182 };
+      const routeData = await getRoadRoute(
+        { lat: mechLocation.lat || 22.9772, lng: mechLocation.lng || 88.4312 },
+        { lat: destLocation.lat || 23.3644, lng: destLocation.lng || 88.3182 }
+      );
+      booking.roadDistanceKm = routeData.distanceKm;
+      booking.estimatedDurationMin = routeData.durationMinutes;
+      booking.routePolyline = routeData.coordinates;
+      booking.routingEngine = routeData.source;
+      if (!booking.orderCode) {
+        booking.orderCode = generateOrderCode();
+      }
+      await booking.save();
+    }
+
     res.json(booking);
   } catch (error) {
     next(error);
   }
 });
+
 
 router.patch('/:id/status', requireAuth, async (req: any, res: any, next) => {
   try {

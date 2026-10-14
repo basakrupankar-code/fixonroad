@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wrench, Menu, X, Globe, MapPin, RefreshCw, ShoppingCart } from 'lucide-react';
+import { Wrench, Menu, X, Globe, MapPin, RefreshCw, ShoppingCart, Package } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
@@ -80,6 +80,13 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
       { to: '/', label: t('nav.switchToRider', 'Switch to Rider/Driver View') },
       { to: '/mechanic#benefits', label: t('nav.benefits', 'Benefits'), isAnchor: true },
       { to: '/mechanic#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
+    ];
+  } else if (user?.role === 'customer') {
+    navLinks = [
+      { to: '/services', label: t('nav.services', 'Services') },
+      { to: '/orders', label: 'My Bookings' },
+      { to: '/mechanic', label: t('nav.forMechanics', 'For Mechanics') },
+      { to: '/#how-it-works', label: t('nav.howItWorks', 'How it Works'), isAnchor: true },
     ];
   } else {
     navLinks = [
@@ -191,6 +198,15 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
             {/* User Profile / Logout or Sign In */}
             {isAuthenticated && user ? (
               <div className="hidden md:flex items-center gap-4">
+                {user.role === 'customer' && (
+                  <Link 
+                    to="/orders" 
+                    className="text-xs font-bold px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/20 hover:text-orange-300 transition-all flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Package className="w-3.5 h-3.5" />
+                    <span>My Orders</span>
+                  </Link>
+                )}
                 <Link to="/profile" className="text-sm font-semibold hover:text-orange-400 transition-colors" style={{ color: 'var(--text-primary)' }}>
                   {user.name || user.phone}
                 </Link>
@@ -281,6 +297,17 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                       {itemCount}
                     </span>
                   )}
+                </Link>
+              )}
+              {isAuthenticated && user?.role === 'customer' && (
+                <Link
+                  to="/orders"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2.5 text-lg font-medium transition-colors hover:text-white"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  <Package className="w-5 h-5 text-orange-400" />
+                  <span>My Bookings</span>
                 </Link>
               )}
               {isAuthenticated && user ? (

@@ -444,6 +444,7 @@ function ScrollToTop() {
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./components/ProtectedRoute";
 import TrackingPage from "./pages/TrackingPage";
+import OrdersPage from "./pages/OrdersPage";
 import CartPage from "./pages/CartPage";
 import AIAssistant from "./components/AIAssistant";
 
@@ -504,6 +505,14 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={['customer']}>
                     <PaymentPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/orders" 
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <OrdersPage />
                   </ProtectedRoute>
                 } 
               />

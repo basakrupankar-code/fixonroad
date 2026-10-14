@@ -25,6 +25,11 @@ const orderSchema = new mongoose.Schema({
     enum: ['cod', 'razorpay', 'upi', 'card', 'netbanking'],
     default: 'cod'
   },
+  orderCode: { type: String, unique: true, sparse: true, index: true },
+  roadDistanceKm: { type: Number },
+  estimatedDurationMin: { type: Number },
+  routePolyline: { type: [[Number]], default: [] },
+  routingEngine: { type: String, default: 'osrm' },
   razorpayOrderId: { type: String },
   razorpayPaymentId: { type: String },
   razorpaySignature: { type: String },
