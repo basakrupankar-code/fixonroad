@@ -101,8 +101,22 @@ function LiveTracker() {
   
   const orderId = localStorage.getItem('active_order_id') || '6ac8e7e0';
 
+  const featuredPartners = [
+    'Rajendra Mondal (Engine Specialist)',
+    'Sunil Yadav (Diagnostic Expert)',
+    'Mohammed Irfan (Multi-Brand Care)',
+    'Rupankar Basak (Auto Specialist)',
+    'Prakash Jadhav (Electrical Expert)',
+    'Debashis Roy (Roadside Master)'
+  ];
+  const [partnerName, setPartnerName] = useState(featuredPartners[0]);
+
   useEffect(() => {
-    const t1 = setTimeout(() => setStatus("found"), 2000);
+    const t1 = setTimeout(() => {
+      const randomPartner = featuredPartners[Math.floor(Math.random() * featuredPartners.length)];
+      setPartnerName(randomPartner);
+      setStatus("found");
+    }, 2000);
     const t2 = setTimeout(() => setStatus("arriving"), 4000);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
@@ -146,7 +160,7 @@ function LiveTracker() {
         </div>
         <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-primary)" }}>
           <div>
-            <p className="font-semibold text-[15px]">{status === "searching" ? t('home.hero.liveTracker.searching', 'Finding nearest mechanic…') : t('home.hero.liveTracker.mechanicFound', 'Sanjay Das (Bike Expert)')}</p>
+            <p className="font-semibold text-[15px]">{status === "searching" ? t('home.hero.liveTracker.searching', 'Finding nearest mechanic…') : partnerName}</p>
             <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>{status === "searching" ? t('home.hero.liveTracker.scanning', 'Scanning 3 km radius') : t('home.hero.liveTracker.eta', '{{distance}} km away · {{eta}} min ETA', { distance, eta })}</p>
           </div>
           <div className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide ${status === "searching" ? "bg-yellow-500/15 text-yellow-400" : status === "found" ? "bg-orange-500/15 text-orange-400" : "bg-emerald-500/15 text-emerald-400"}`}>

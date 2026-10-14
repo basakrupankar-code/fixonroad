@@ -17,6 +17,17 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
 });
 
+interface MechanicInfo {
+  name: string;
+  specialty: string;
+  hub: string;
+  vehicle: string;
+  phone: string;
+  rating: number;
+  originLat: number;
+  originLng: number;
+}
+
 export default function TrackingPage() {
   const { orderId } = useParams();
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -31,31 +42,31 @@ export default function TrackingPage() {
     return (R * c).toFixed(1);
   };
 
-  const kalyaniCoords = [22.9772, 88.4312]; // Kalyani Central Park
-  const samudragarCoords = [23.3644, 88.3182]; // Samudragar breakdown location
-  const initialDistance = calculateDistance(kalyaniCoords[0], kalyaniCoords[1], samudragarCoords[0], samudragarCoords[1]); // returns ~41.7
-  const calculatedEta = Math.round(Number(initialDistance) * 2.5); // ~104 min
+  const defaultOrigin = [22.9772, 88.4312]; // Kalyani Central Park Auto Hub fallback
+  const defaultDestination = [23.3644, 88.3182]; // Breakdown location fallback
+  const initialDistance = calculateDistance(defaultOrigin[0], defaultOrigin[1], defaultDestination[0], defaultDestination[1]);
 
-  const [eta, setEta] = useState<number>(calculatedEta);
-  const [status, setStatus] = useState('Mechanic Assigned');
+  const [eta, setEta] = useState<number>(Math.max(5, Math.round(Number(initialDistance) * 2.5)));
+  const [status, setStatus] = useState('Finding Mechanic...');
+  const [paymentStatus, setPaymentStatus] = useState<string>('PENDING');
   const [distance, setDistance] = useState<string>(initialDistance);
   const destinationLabel = 
     localStorage.getItem('user_city') || 
     localStorage.getItem('user_address') || 
-    'Samudragar, West Bengal';
+    'Your Breakdown Location';
   const [destination, setDestination] = useState<string>(destinationLabel);
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number}>({ lat: samudragarCoords[0], lng: samudragarCoords[1] });
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number}>({ lat: defaultDestination[0], lng: defaultDestination[1] });
 
-  const mechanic = {
-    name: "Sanjay Das",
-    specialty: "Bike & Car Specialist",
-    hub: "Kalyani Central Park Auto Hub",
-    vehicle: "Hero Splendor (WB-24-9812)",
-    phone: "+91 98765 43210",
+  const [mechanic, setMechanic] = useState<MechanicInfo>({
+    name: "Dispatching Technician...",
+    specialty: "Certified Roadside Specialist",
+    hub: "FixOnRoad Rapid Response Hub",
+    vehicle: "Emergency Service Vehicle",
+    phone: "+91 98001 12233",
     rating: 4.9,
-    originLat: kalyaniCoords[0],
-    originLng: kalyaniCoords[1]
-  };
+    originLat: defaultOrigin[0],
+    originLng: defaultOrigin[1]
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -68,42 +79,66 @@ export default function TrackingPage() {
         }
         const data = await safeFetch(`/api/v1/bookings/${orderId}`, { headers });
         if (isMounted && data) {
-            setStatus(data.status ? data.status.replace('_', ' ') : 'MECHANIC ASSIGNED');
-            
-            // Extract location
-            const address = data.location?.address || data.address;
-            const destinationAddress = 
-              address || 
-              localStorage.getItem('breakdown_address') || 
-              'Samudragar, West Bengal';
+          setStatus(data.status ? data.status.replace(/_/g, ' ') : 'MECHANIC ASSIGNED');
+          setPaymentStatus(data.status === 'PAID' ? 'PAID' : (data.paymentMethod === 'cod' ? 'COD' : 'PENDING'));
 
-            const destinationCoords = 
-              (data.location?.lat && data.location?.lng) 
-                ? [data.location.lat, data.location.lng] 
-                : (destinationAddress.toLowerCase().includes('samudragar') 
-                    ? [23.3644, 88.3182] 
-                    : [23.3644, 88.3182]); // Default fallback to breakdown site, NOT live IP
+          // Extract breakdown destination coordinates
+          const address = data.location?.address || data.address;
+          const destinationAddress = 
+            address || 
+            localStorage.getItem('breakdown_address') || 
+            'Your Breakdown Location';
 
-            const originCoords = [22.9772, 88.4312]; // Kalyani Central Park Auto Hub
+          const destLat = typeof data.location?.lat === 'number' && data.location.lat !== 0 ? data.location.lat : defaultDestination[0];
+          const destLng = typeof data.location?.lng === 'number' && data.location.lng !== 0 ? data.location.lng : defaultDestination[1];
 
-            setDestination(destinationAddress);
-            setUserLocation({ lat: destinationCoords[0], lng: destinationCoords[1] });
-            
-            const dist = calculateDistance(originCoords[0], originCoords[1], destinationCoords[0], destinationCoords[1]);
-            setDistance(dist);
-            // rough estimate: 1 km = 3 mins in city traffic
-            setEta(Math.max(5, Math.round(Number(dist) * 3)));
+          setDestination(destinationAddress);
+          setUserLocation({ lat: destLat, lng: destLng });
+
+          // Extract populated mechanic details dynamically from the order
+          let mechLat = defaultOrigin[0];
+          let mechLng = defaultOrigin[1];
+
+          if (data.mechanicId && typeof data.mechanicId === 'object') {
+            const m = data.mechanicId;
+            if (typeof m.currentLocation?.lat === 'number' && m.currentLocation.lat !== 0) {
+              mechLat = m.currentLocation.lat;
+            }
+            if (typeof m.currentLocation?.lng === 'number' && m.currentLocation.lng !== 0) {
+              mechLng = m.currentLocation.lng;
+            }
+
+            const specialties = Array.isArray(m.serviceCategories) && m.serviceCategories.length > 0
+              ? m.serviceCategories.join(' • ')
+              : m.specialization || 'Certified Roadside Specialist';
+
+            setMechanic({
+              name: m.name || 'Certified Technician',
+              specialty: specialties,
+              hub: m.workshopName || 'FixOnRoad Certified Partner Garage',
+              vehicle: m.vehiclePlate ? `Vehicle (${m.vehiclePlate})` : 'Rapid Response Unit',
+              phone: m.phone || '+91 98001 12233',
+              rating: typeof m.rating === 'number' && m.rating > 0 ? m.rating : 4.9,
+              originLat: mechLat,
+              originLng: mechLng
+            });
           }
-        } catch (err) {
-          console.error("Failed to fetch order status", err);
+
+          const dist = calculateDistance(mechLat, mechLng, destLat, destLng);
+          setDistance(dist);
+          // 1 km ~ 2.5 mins in typical traffic, min 5 mins
+          setEta(Math.max(5, Math.round(Number(dist) * 2.5)));
         }
-      };
+      } catch (err) {
+        console.error("Failed to fetch order status", err);
+      }
+    };
     
     fetchStatus();
     const interval = setInterval(() => {
       fetchStatus();
       setEta((prev) => Math.max(1, prev - 1));
-    }, 15000); // Polling every 15s is safer
+    }, 12000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -134,8 +169,12 @@ export default function TrackingPage() {
               <div className="w-px h-10 bg-slate-800" />
               <div className="text-right">
                 <div className="text-3xl font-extrabold text-orange-500">{eta} min</div>
-                <span className="inline-block mt-1 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-md">
-                  NOT PAID (CASH ON ARRIVAL)
+                <span className={`inline-block mt-1 text-xs font-bold px-2.5 py-0.5 rounded-md border ${
+                  paymentStatus === 'PAID'
+                    ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                    : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                }`}>
+                  {paymentStatus === 'PAID' ? 'PAID ONLINE (VERIFIED)' : 'CASH ON ARRIVAL'}
                 </span>
               </div>
             </div>
@@ -148,18 +187,26 @@ export default function TrackingPage() {
                {/* Mechanic Profile */}
                <div className="bg-[#0B0F17] rounded-2xl border border-slate-800 p-5 flex items-start gap-4">
                  <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 border-2 border-orange-500/30">
-                    <img src="https://ui-avatars.com/api/?name=Sanjay+Das&background=f97316&color=fff" alt="Mechanic" className="w-full h-full object-cover" />
+                    <img 
+                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(mechanic.name)}&background=f97316&color=fff&bold=true`} 
+                      alt={mechanic.name} 
+                      className="w-full h-full object-cover" 
+                    />
                  </div>
-                 <div className="flex-1">
-                   <h3 className="font-bold text-lg">{mechanic.name}</h3>
-                   <div className="text-sm text-slate-400 mb-2">{mechanic.specialty} • {mechanic.rating} ★</div>
+                 <div className="flex-1 min-w-0">
+                   <h3 className="font-bold text-lg truncate text-white">{mechanic.name}</h3>
+                   <div className="text-sm text-slate-400 mb-2 truncate">{mechanic.specialty} • {mechanic.rating} ★</div>
                    <div className="inline-flex items-center gap-1.5 bg-orange-500/10 text-orange-400 px-2.5 py-1 rounded-md text-xs font-medium border border-orange-500/20">
                      {mechanic.vehicle}
                    </div>
                  </div>
-                 <button className="p-3 bg-emerald-500/10 text-emerald-400 rounded-full hover:bg-emerald-500/20 transition-colors">
+                 <a 
+                   href={`tel:${mechanic.phone}`}
+                   className="p-3 bg-emerald-500/10 text-emerald-400 rounded-full hover:bg-emerald-500/20 transition-colors shrink-0 border border-emerald-500/20"
+                   title={`Call ${mechanic.name}`}
+                 >
                    <PhoneCall className="w-5 h-5" />
-                 </button>
+                 </a>
                </div>
 
                {/* Route Timeline */}
@@ -209,8 +256,9 @@ export default function TrackingPage() {
                   `}</style>
                   <Marker position={[mechanic.originLat, mechanic.originLng]}>
                     <Popup className="font-['Outfit']">
-                      <strong>Starting Origin</strong><br/>
-                      {mechanic.hub}
+                      <strong>{mechanic.name}</strong><br/>
+                      {mechanic.hub}<br/>
+                      <span className="text-xs text-orange-500">{mechanic.specialty}</span>
                     </Popup>
                   </Marker>
                   <Marker position={[userLocation.lat, userLocation.lng]}>
