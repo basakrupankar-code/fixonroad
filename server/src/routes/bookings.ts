@@ -216,8 +216,22 @@ router.get('/mechanic-earnings', requireAuth, async (req: any, res: any, next) =
 
 router.post('/', requireAuth, async (req: any, res: any, next) => {
   try {
-    let { mechanicId, serviceDetails, location, paymentMethod } = req.body;
+    let { mechanicId, serviceDetails, serviceType, basePrice, location, paymentMethod, status } = req.body;
     
+    if (!serviceDetails && serviceType) {
+      const base = Number(basePrice) || 150;
+      const gst = Math.round(base * 0.18);
+      const platformFee = 10;
+      const platformGst = Math.round(platformFee * 0.18);
+      serviceDetails = {
+        serviceType,
+        basePrice: base,
+        gst,
+        platformFee: platformFee + platformGst,
+        totalAmount: base + gst + platformFee + platformGst
+      };
+    }
+
     let assignedMechanicDoc: any = null;
     // 1. If mechanicId is provided, fetch the mechanic; otherwise auto-assign
     if (mechanicId && mongoose.Types.ObjectId.isValid(mechanicId)) {
@@ -254,7 +268,7 @@ router.post('/', requireAuth, async (req: any, res: any, next) => {
       serviceDetails,
       location,
       paymentMethod: paymentMethod || 'cod',
-      status: mechanicId ? 'CONFIRMED' : 'PENDING',
+      status: status || (mechanicId ? 'CONFIRMED' : 'PENDING'),
       roadDistanceKm: routeData.distanceKm,
       estimatedDurationMin: routeData.durationMinutes,
       routePolyline: routeData.coordinates,
@@ -262,7 +276,8 @@ router.post('/', requireAuth, async (req: any, res: any, next) => {
       expiresAt: new Date(Date.now() + 600000) // expires in 10 mins
     });
 
-    res.status(201).json(newOrder);
+    const populatedOrder = await Order.findById(newOrder._id).populate('mechanicId');
+    res.status(201).json(populatedOrder || newOrder);
   } catch (error) {
     next(error);
   }
@@ -356,19 +371,112 @@ router.get('/route-geometry', async (req: any, res: any, next) => {
   }
 });
 
-router.get('/:id', optionalAuth, async (req: any, res: any, next) => {
+// Dedicated Live Tracking Telemetry Endpoint: strictly gated behind auth, ownership & confirmed status
+router.get('/track/:id', requireAuth, async (req: any, res: any, next) => {
   try {
     const { id } = req.params;
+    const currentUserId = (req.user?.userId || req.user?._id || '').toString();
     
     // Support lookup by MongoDB ObjectId, orderCode, or trackingCode
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const query = isObjectId 
-      ? { _id: id } 
+      ? { $or: [{ _id: id }, { orderCode: id.toUpperCase() }, { trackingCode: id.toUpperCase() }] } 
       : { $or: [{ orderCode: id.toUpperCase() }, { trackingCode: id.toUpperCase() }] };
 
     let booking = await Order.findOne(query).populate('mechanicId');
     if (!booking) {
-      return res.status(404).json({ error: { message: 'Booking not found' } });
+      return res.status(404).json({ error: { message: 'Order not found', code: 'ORDER_NOT_FOUND' } });
+    }
+
+    // 1. Customer Ownership & Role Gating:
+    // Only allow customer creator, assigned mechanic, or admin
+    const isOwner = booking.userId && booking.userId.toString() === currentUserId;
+    const mechId = (booking.mechanicId as any)?._id?.toString() || booking.mechanicId?.toString();
+    const isAssignedMechanic = mechId && mechId === currentUserId;
+    const isAdmin = req.user?.role === 'admin';
+
+    if (!isOwner && !isAssignedMechanic && !isAdmin) {
+      return res.status(403).json({ 
+        error: { 
+          message: 'Access Denied: You do not have permission to view this order telemetry',
+          code: 'UNAUTHORIZED_ACCESS'
+        } 
+      });
+    }
+
+    // 2. Verified Active/Confirmed Status Check
+    const statusUpper = (booking.status || '').toUpperCase();
+    const INACTIVE_STATUSES = ['FAILED', 'CANCELLED', 'EXPIRED'];
+    if (INACTIVE_STATUSES.includes(statusUpper)) {
+      return res.status(400).json({
+        error: {
+          message: `Order is ${booking.status.toLowerCase()} and does not have an active live dispatch`,
+          code: 'ORDER_INACTIVE',
+          status: booking.status
+        }
+      });
+    }
+
+    // 3. Dynamically backfill road network geometry & realistic ETA if missing
+    if (!booking.routePolyline || booking.routePolyline.length <= 2 || !booking.roadDistanceKm) {
+      const mechLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.975, lng: 88.434 };
+      const destLocation = booking.location || { lat: 23.361, lng: 88.318 };
+      const routeData = await getRoadRoute(
+        { lat: mechLocation.lat || 22.975, lng: mechLocation.lng || 88.434 },
+        { lat: destLocation.lat || 23.361, lng: destLocation.lng || 88.318 }
+      );
+      booking.roadDistanceKm = routeData.distanceKm;
+      booking.estimatedDurationMin = routeData.durationMinutes;
+      booking.routePolyline = routeData.coordinates as any;
+      booking.routingEngine = routeData.source;
+      if (!booking.orderCode) {
+        booking.orderCode = generateOrderCode();
+      }
+      booking.trackingCode = booking.orderCode;
+      await booking.save();
+    }
+
+    const bookingData: any = booking.toObject ? booking.toObject() : { ...booking };
+    bookingData.trackingCode = booking.trackingCode || booking.orderCode || `FOR-${booking._id.toString().slice(0, 8).toUpperCase()}`;
+    bookingData.orderCode = bookingData.trackingCode;
+    bookingData.hubLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.975, lng: 88.434 };
+
+    res.json(bookingData);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Standard booking lookup endpoint with strict ownership gating
+router.get('/:id', requireAuth, async (req: any, res: any, next) => {
+  try {
+    const { id } = req.params;
+    const currentUserId = (req.user?.userId || req.user?._id || '').toString();
+    
+    // Support lookup by MongoDB ObjectId, orderCode, or trackingCode
+    const isObjectId = mongoose.Types.ObjectId.isValid(id);
+    const query = isObjectId 
+      ? { $or: [{ _id: id }, { orderCode: id.toUpperCase() }, { trackingCode: id.toUpperCase() }] } 
+      : { $or: [{ orderCode: id.toUpperCase() }, { trackingCode: id.toUpperCase() }] };
+
+    let booking = await Order.findOne(query).populate('mechanicId');
+    if (!booking) {
+      return res.status(404).json({ error: { message: 'Booking not found', code: 'BOOKING_NOT_FOUND' } });
+    }
+
+    // Customer Ownership & Role Gating
+    const isOwner = booking.userId && booking.userId.toString() === currentUserId;
+    const mechId = (booking.mechanicId as any)?._id?.toString() || booking.mechanicId?.toString();
+    const isAssignedMechanic = mechId && mechId === currentUserId;
+    const isAdmin = req.user?.role === 'admin';
+
+    if (!isOwner && !isAssignedMechanic && !isAdmin) {
+      return res.status(403).json({ 
+        error: { 
+          message: 'Access Denied: You do not have permission to view this booking',
+          code: 'UNAUTHORIZED_ACCESS'
+        } 
+      });
     }
 
     // If routePolyline is missing or empty or a 2-point straight line, dynamically compute & backfill it
@@ -381,7 +489,7 @@ router.get('/:id', optionalAuth, async (req: any, res: any, next) => {
       );
       booking.roadDistanceKm = routeData.distanceKm;
       booking.estimatedDurationMin = routeData.durationMinutes;
-      booking.routePolyline = routeData.coordinates;
+      booking.routePolyline = routeData.coordinates as any;
       booking.routingEngine = routeData.source;
       if (!booking.orderCode) {
         booking.orderCode = generateOrderCode();
@@ -390,7 +498,7 @@ router.get('/:id', optionalAuth, async (req: any, res: any, next) => {
       await booking.save();
     }
 
-    const bookingData = booking.toObject ? booking.toObject() : { ...booking };
+    const bookingData: any = booking.toObject ? booking.toObject() : { ...booking };
     bookingData.trackingCode = booking.trackingCode || booking.orderCode || `FOR-${booking._id.toString().slice(0, 8).toUpperCase()}`;
     bookingData.orderCode = bookingData.trackingCode;
     bookingData.hubLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.975, lng: 88.434 };

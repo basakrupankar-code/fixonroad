@@ -221,22 +221,30 @@ export default function PaymentPage() {
             <p className="text-[15px] mb-6" style={{ color: 'var(--text-secondary)' }}>{t('payment.success.subtitle')}</p>
 
             <div className="rounded-xl p-4 mb-6 text-left space-y-2.5" style={{ background: 'var(--bg-card)' }}>
-              <div className="flex justify-between text-[15px]">
-                <span style={{ color: 'var(--text-muted)' }}>{t('payment.success.service')}</span>
-                <span className="font-medium">{service?.nameKey ? t(service.nameKey, service.name) : service?.name}</span>
-              </div>
-              <div className="flex justify-between text-[15px]">
-                <span style={{ color: 'var(--text-muted)' }}>{t('payment.success.amountPaid')}</span>
-                <span className="font-bold text-emerald-400">₹{totalAmount}</span>
-              </div>
               <div className="flex justify-between text-[15px] items-center">
                 <span style={{ color: 'var(--text-muted)' }}>{t('payment.success.orderId')}</span>
                 <span className="flex items-center gap-1.5 font-mono text-xs font-bold text-orange-400">
                   {confirmedOrderCode || confirmedOrderId || 'FOR-ORDER'}
-                  <button onClick={copyOrderId} className="transition-colors hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
+                  <button onClick={copyOrderId} className="transition-colors hover:opacity-80 cursor-pointer" style={{ color: 'var(--text-muted)' }} title="Copy Code">
                     {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                 </span>
+              </div>
+              <div className="flex justify-between text-[15px]">
+                <span style={{ color: 'var(--text-muted)' }}>{t('payment.success.service')}</span>
+                <span className="font-bold text-white text-right max-w-[200px] truncate">{service?.nameKey ? t(service.nameKey, service.name) : service?.name}</span>
+              </div>
+              <div className="flex justify-between text-[15px] items-start gap-2">
+                <span style={{ color: 'var(--text-muted)' }} className="shrink-0">Breakdown Spot</span>
+                <span className="font-medium text-slate-200 text-xs text-right truncate max-w-[210px]">{address || 'Bengal Breakdown Spot'}</span>
+              </div>
+              <div className="flex justify-between text-[15px]">
+                <span style={{ color: 'var(--text-muted)' }}>{t('payment.success.method')}</span>
+                <span className="capitalize text-slate-200 text-xs font-medium">{method === 'cod' ? 'Cash on Delivery (Pay to Mechanic)' : `${method.toUpperCase()} (Online Payment)`}</span>
+              </div>
+              <div className="flex justify-between text-[15px] pt-2 border-t border-slate-800">
+                <span style={{ color: 'var(--text-muted)' }}>{t('payment.success.amountPaid')}</span>
+                <span className="font-bold text-emerald-400">₹{totalAmount}</span>
               </div>
               {confirmedPaymentId && (
                 <div className="flex justify-between text-[15px] items-center">
@@ -244,14 +252,10 @@ export default function PaymentPage() {
                   <span className="font-mono text-xs text-orange-400 truncate max-w-[160px]">{confirmedPaymentId}</span>
                 </div>
               )}
-              <div className="flex justify-between text-[15px]">
-                <span style={{ color: 'var(--text-muted)' }}>{t('payment.success.method')}</span>
-                <span className="capitalize">{method === 'cod' ? t('payment.success.codMethod') : `${method.toUpperCase()} (Razorpay Test Mode)`}</span>
-              </div>
             </div>
 
             <p className="text-xs flex items-center justify-center gap-1.5 mb-6" style={{ color: 'var(--text-muted)' }}>
-              <Shield className="w-3.5 h-3.5" />
+              <Shield className="w-3.5 h-3.5 text-orange-400" />
               {t('payment.success.invoiceText')}
             </p>
 
@@ -259,16 +263,16 @@ export default function PaymentPage() {
               <button
                 type="button"
                 onClick={() => navigate(`/track/${confirmedOrderCode || confirmedOrderId || '6ac8e7e0a6f24ff6530cc8a0'}`)}
-                className="btn-primary flex-1 py-3 text-center"
+                className="btn-primary flex-1 py-3.5 text-center flex items-center justify-center gap-2 cursor-pointer font-black text-sm"
               >
-                Track Mechanic Live
+                <span>Track Live Dispatch →</span>
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/orders')}
-                className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-semibold transition-colors text-center text-white border border-slate-700"
+                className="px-5 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-bold transition-colors text-center text-white border border-slate-700 cursor-pointer"
               >
-                View My Bookings
+                View All Bookings
               </button>
             </div>
             <div className="mt-4">

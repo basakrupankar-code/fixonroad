@@ -172,7 +172,7 @@ interface OrderData {
   routingEngine?: string;
 }
 
-export default function TrackingPage() {
+export default function TrackingPage({ initialOrder }: { initialOrder?: OrderData }) {
   const { t } = useLanguage();
   const { orderId } = useParams<{ orderId: string }>();
 
@@ -182,10 +182,16 @@ export default function TrackingPage() {
   const initialCalculations = calculateEstimatedRoadDistance(defaultHub, defaultUser);
   const initialRoadCurve = generateRoadCurveGeometry(defaultHub, defaultUser);
 
-  const [order, setOrder] = useState<OrderData | null>(null);
-  const [distance, setDistance] = useState<string>(initialCalculations.distanceKm.toFixed(1));
-  const [eta, setEta] = useState<number>(initialCalculations.durationMin);
-  const [routeCoords, setRouteCoords] = useState<[number, number][]>(initialRoadCurve);
+  const [order, setOrder] = useState<OrderData | null>(initialOrder || null);
+  const [distance, setDistance] = useState<string>(
+    initialOrder?.roadDistanceKm ? initialOrder.roadDistanceKm.toFixed(1) : initialCalculations.distanceKm.toFixed(1)
+  );
+  const [eta, setEta] = useState<number>(
+    initialOrder?.estimatedDurationMin ? initialOrder.estimatedDurationMin : initialCalculations.durationMin
+  );
+  const [routeCoords, setRouteCoords] = useState<[number, number][]>(
+    initialOrder?.routePolyline && initialOrder.routePolyline.length > 2 ? initialOrder.routePolyline : initialRoadCurve
+  );
   const [copied, setCopied] = useState<boolean>(false);
   const [isLiveRouting, setIsLiveRouting] = useState<boolean>(true);
 
@@ -206,7 +212,7 @@ export default function TrackingPage() {
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
-        const data = await safeFetch(`/api/v1/bookings/${orderId}`, { headers });
+        const data = await safeFetch(`/api/orders/track/${orderId}`, { headers });
         if (isMounted && data) {
           setOrder(data);
 

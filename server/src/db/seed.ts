@@ -241,7 +241,7 @@ const SERVICE_CATALOG = [
   { serviceType: 'towing', name: 'Rapid Two-Wheeler Towing', basePrice: 799 }
 ];
 
-const ORDER_STATUSES = ['COMPLETED', 'CONFIRMED', 'PAID', 'EN_ROUTE', 'MECHANIC_ASSIGNED', 'ARRIVED', 'PENDING'];
+const ORDER_STATUSES = ['COMPLETED', 'CONFIRMED', 'PAID', 'EN_ROUTE', 'MECHANIC_ASSIGNED', 'ARRIVED', 'PENDING'] as const;
 
 export async function runSeed() {
   console.log('═══════════════════════════════════════════════════════════════');

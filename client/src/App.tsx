@@ -437,6 +437,7 @@ function ScrollToTop() {
 
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./components/ProtectedRoute";
+import OrderTrackGuard from "./components/OrderTrackGuard";
 import TrackingPage from "./pages/TrackingPage";
 import OrdersPage from "./pages/OrdersPage";
 import CartPage from "./pages/CartPage";
@@ -507,11 +508,19 @@ export default function App() {
                 />
                 <Route 
                   path="/orders" 
-                  element={<OrdersPage />} 
+                  element={
+                    <ProtectedRoute allowedRoles={['customer']}>
+                      <OrdersPage />
+                    </ProtectedRoute>
+                  } 
                 />
                 <Route 
                   path="/track/:orderId" 
-                  element={<TrackingPage />} 
+                  element={
+                    <OrderTrackGuard>
+                      {({ order }) => <TrackingPage initialOrder={order} />}
+                    </OrderTrackGuard>
+                  } 
                 />
                 <Route 
                   path="/profile" 

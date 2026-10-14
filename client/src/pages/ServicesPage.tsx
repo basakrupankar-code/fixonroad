@@ -8,6 +8,9 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useLocationContext } from '../context/LocationContext';
+import { safeFetch } from '../lib/api';
+import OrderConfirmationModal, { OrderConfirmationData } from '../components/OrderConfirmationModal';
 
 /* ===== Service Data ===== */
 type VehicleType = 'bike' | 'car';
@@ -212,9 +215,13 @@ export default function ServicesPage() {
   }, [searchQuery, filterType]);
 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [confirmedOrder, setConfirmedOrder] = useState<OrderConfirmationData | null>(null);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
   const { user, isAuthenticated } = useAuth();
-  const { addItem, removeItem, isInCart } = useCart();
+  const { addItem, removeItem, isInCart, clearCart } = useCart();
+  const { address } = useLocationContext();
 
   const handleProceed = (serviceId: string) => {
     if (!isAuthenticated) {
@@ -236,6 +243,76 @@ export default function ServicesPage() {
           quantity: 1,
         });
       }
+    }
+  };
+
+  const handleEmergencyDispatch = async () => {
+    if (!selectedService) return;
+    if (!user) {
+      navigate(`/auth?redirect=${encodeURIComponent('/services')}`);
+      return;
+    }
+
+    setIsSubmittingOrder(true);
+    try {
+      const token = localStorage.getItem('token') || (user as any)?.token;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const basePrice = selectedService.price;
+      const serviceGst = Math.round(basePrice * 0.18);
+      const platformFee = 50;
+      const totalAmount = basePrice + serviceGst + platformFee;
+
+      const res = await safeFetch('/api/orders', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          serviceType: selectedService.id,
+          basePrice: selectedService.price,
+          serviceDetails: {
+            serviceType: selectedService.name,
+            basePrice,
+            gst: serviceGst,
+            platformFee,
+            totalAmount
+          },
+          location: {
+            address: address || 'Kalyani, Nadia, West Bengal',
+            lat: 22.9772,
+            lng: 88.4312
+          },
+          paymentMethod: 'cod',
+          status: 'CONFIRMED'
+        })
+      });
+
+      // Clear draft/cart state
+      clearCart();
+      const created = res.data || res;
+      setConfirmedOrder({
+        _id: created._id,
+        orderCode: created.orderCode,
+        trackingCode: created.trackingCode || created.orderCode,
+        serviceType: selectedService.name,
+        serviceName: selectedService.name,
+        breakdownAddress: address || 'Bengal Breakdown Spot',
+        paymentMethod: 'cod',
+        totalAmount: totalAmount,
+        status: 'CONFIRMED'
+      });
+      setSelectedService(null);
+      setShowConfirmationModal(true);
+      toast.success('Emergency dispatch order created!');
+    } catch (err: any) {
+      console.error('Failed to create instant emergency booking:', err);
+      toast.error(err.message || 'Failed to dispatch mechanic. Please try again.');
+    } finally {
+      setIsSubmittingOrder(false);
     }
   };
 
@@ -533,16 +610,32 @@ export default function ServicesPage() {
                 </button>
 
                 <button 
-                  onClick={handleCheckout} 
-                  className="flex-1 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors text-lg cursor-pointer shadow-lg shadow-orange-500/20"
+                  onClick={handleEmergencyDispatch} 
+                  disabled={isSubmittingOrder}
+                  className="flex-1 py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 disabled:opacity-50 text-white font-black rounded-xl flex items-center justify-center gap-2 transition-all text-base sm:text-lg cursor-pointer shadow-lg shadow-orange-500/25 hover:scale-[1.01]"
                 >
-                  {t('checkout.proceedToCheckout', 'Proceed to Checkout')} <ChevronRight className="w-5 h-5" />
+                  <AlertTriangle className="w-5 h-5" />
+                  <span>{isSubmittingOrder ? 'Dispatching Mechanic...' : 'Instant Dispatch (COD)'}</span>
+                </button>
+
+                <button 
+                  onClick={handleCheckout} 
+                  className="py-4 px-6 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors text-base cursor-pointer border border-slate-700"
+                >
+                  {t('checkout.proceedToCheckout', 'Online Checkout')} <ChevronRight className="w-5 h-5" />
                 </button>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Post-Booking Order Confirmation Modal */}
+      <OrderConfirmationModal
+        isOpen={showConfirmationModal}
+        onClose={() => setShowConfirmationModal(false)}
+        order={confirmedOrder}
+      />
     </div>
   );
 }

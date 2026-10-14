@@ -46,6 +46,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
   const [profileOpen, setProfileOpen] = useState<boolean>(false);
   const [hasActiveOrder, setHasActiveOrder] = useState<boolean>(false);
+  const [activeOrderCode, setActiveOrderCode] = useState<string | null>(null);
 
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -73,7 +74,8 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  // Check for active dispatch orders dynamically to show pulsing radar badge
+  // Check for active dispatch orders dynamically:
+  // Only show pulsing dot / direct quick-link if status is 'en_route' or 'dispatched'
   useEffect(() => {
     let isMounted = true;
     if (isAuthenticated && user?.role !== 'mechanic') {
@@ -85,18 +87,28 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
         .then((res) => {
           if (!isMounted) return;
           const list = res?.orders || res?.bookings || (Array.isArray(res) ? res : []);
-          const active = list.some((o: any) =>
-            ['PENDING', 'CONFIRMED', 'ASSIGNED', 'MECHANIC_ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(
-              (o.status || '').toUpperCase()
-            )
-          );
-          setHasActiveOrder(active);
+          const active = list.find((o: any) => {
+            const s = (o.status || '').toUpperCase();
+            return s === 'EN_ROUTE' || s === 'DISPATCHED' || s === 'MECHANIC_DISPATCHED';
+          });
+          if (active) {
+            setHasActiveOrder(true);
+            const code = active.trackingCode || active.orderCode || active._id;
+            setActiveOrderCode(code);
+          } else {
+            setHasActiveOrder(false);
+            setActiveOrderCode(null);
+          }
         })
         .catch(() => {
-          if (isMounted) setHasActiveOrder(false);
+          if (isMounted) {
+            setHasActiveOrder(false);
+            setActiveOrderCode(null);
+          }
         });
     } else {
       setHasActiveOrder(false);
+      setActiveOrderCode(null);
     }
     return () => {
       isMounted = false;
@@ -123,7 +135,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
     { to: '/services', label: t('nav.services', 'Services') },
     { to: '/#how-it-works', label: t('nav.howItWorks', 'How It Works'), isAnchor: true },
     { 
-      to: '/orders', 
+      to: isAuthenticated ? '/orders' : '/auth?redirect=/orders', 
       label: t('nav.trackOrders', 'Track Orders'), 
       hasPulse: hasActiveOrder 
     },
@@ -219,6 +231,16 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-orange-500" />
                     </span>
+                  )}
+                  {link.hasPulse && activeOrderCode && (
+                    <Link
+                      to={`/track/${activeOrderCode}`}
+                      className="ml-1.5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-500/15 text-orange-400 border border-orange-500/30 hover:bg-orange-500/25 transition-all shadow-sm"
+                      title="Open Live Dispatch Tracking"
+                    >
+                      <Navigation className="w-3 h-3 text-orange-400" />
+                      <span>Live</span>
+                    </Link>
                   )}
                   {isActive && (
                     <motion.div
@@ -339,7 +361,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                         {/* Dropdown Menu Items */}
                         <div className="space-y-1">
                           <Link
-                            to="/orders"
+                            to={isAuthenticated ? "/orders" : "/auth?redirect=/orders"}
                             onClick={() => setProfileOpen(false)}
                             className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors"
                           >
@@ -353,6 +375,20 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                               </span>
                             )}
                           </Link>
+
+                          {hasActiveOrder && activeOrderCode && (
+                            <Link
+                              to={`/track/${activeOrderCode}`}
+                              onClick={() => setProfileOpen(false)}
+                              className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-all"
+                            >
+                              <span className="flex items-center gap-2">
+                                <Navigation className="w-3.5 h-3.5 text-orange-400" />
+                                <span>Track Active Order</span>
+                              </span>
+                              <span className="font-mono text-[10px]">{activeOrderCode.slice(0, 10)}</span>
+                            </Link>
+                          )}
 
                           <Link
                             to="/profile"
@@ -516,7 +552,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                   </HashLink>
 
                   <Link
-                    to="/orders"
+                    to={isAuthenticated ? "/orders" : "/auth?redirect=/orders"}
                     onClick={() => setMobileOpen(false)}
                     className="flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium text-zinc-300 hover:text-orange-400 active:text-orange-500 hover:bg-white/[0.05] transition-colors duration-200"
                   >
@@ -528,6 +564,20 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                       <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping shrink-0" />
                     )}
                   </Link>
+
+                  {hasActiveOrder && activeOrderCode && (
+                    <Link
+                      to={`/track/${activeOrderCode}`}
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-bold bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Navigation className="w-4 h-4 text-orange-400" />
+                        <span>Track Live Dispatch</span>
+                      </div>
+                      <span className="font-mono text-xs">{activeOrderCode.slice(0, 10)}</span>
+                    </Link>
+                  )}
 
                   {isAuthenticated && (
                     <Link
