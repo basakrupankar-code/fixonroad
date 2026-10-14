@@ -26,6 +26,7 @@ const orderSchema = new mongoose.Schema({
     default: 'cod'
   },
   orderCode: { type: String, unique: true, sparse: true, index: true },
+  trackingCode: { type: String, unique: true, sparse: true, index: true },
   roadDistanceKm: { type: Number },
   estimatedDurationMin: { type: Number },
   routePolyline: { type: [[Number]], default: [] },

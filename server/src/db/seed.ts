@@ -1,472 +1,389 @@
 /**
- * seed.ts — Populates the FixOnRoad MongoDB Atlas cluster with realistic
- * driver (customer) and mechanic data for analysis & security auditing.
+ * seed.ts — FixOnRoad MongoDB Atlas Realistic Seeding Script
  *
- * Run:  npx tsx src/db/seed.ts
+ * Populates realistic production-grade data for the FixOnRoad platform:
+ *   • 10 Verified Mechanics across Bengal hubs (Kalyani, Nadia, Hooghly, North 24 Parganas)
+ *   • 50 Real Customers across Bengal
+ *   • 25 Orders with 16-character cryptographic tracking codes (FOR-XXXXXXXXXXXXXXXX)
  *
- * What it creates:
- *   • 20 customer users (role: 'customer')
- *   • 15 mechanics with workshop details, specializations & live locations
- *   • 30 orders linking customers ↔ mechanics across every status & payment method
- *
- * All passwords are bcrypt-hashed ("Test@1234").
- * Phone numbers use realistic Indian +91 format.
- * Locations span Kolkata, Delhi, Mumbai, Bangalore, Chennai, Hyderabad, Pune, Jaipur.
+ * Usage: npm run seed  (or npx tsx src/db/seed.ts)
  */
 
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { User } from '../models/User';
 import { Mechanic } from '../models/Mechanic';
 import { Order } from '../models/Order';
+import { generateOrderCode } from '../utils/orderCode';
+import { getRoadRoute } from '../utils/routing';
 
 dotenv.config();
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/fixonroad';
+const DEFAULT_PASSWORD = bcrypt.hashSync('Test@1234', 10);
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const hash = (pwd: string) => bcrypt.hashSync(pwd, 10);
-const DEFAULT_PWD = hash('Test@1234');
-
-const randomBetween = (min: number, max: number) =>
-  +(min + Math.random() * (max - min)).toFixed(6);
-
-const pick = <T>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)];
-
-// ─── Indian City Coordinates (lat/lng bounding boxes) ─────────────────────────
-
-const CITIES: Record<string, { lat: [number, number]; lng: [number, number]; names: string[] }> = {
-  Kolkata: {
-    lat: [22.48, 22.62],
-    lng: [88.30, 88.42],
-    names: [
-      'Park Street', 'Salt Lake Sector V', 'Howrah Station Area',
-      'Jadavpur', 'New Town Action Area II', 'Gariahat',
-    ],
+// ─── 10 Real Bengal Mechanics ──────────────────────────────────────────────────
+const REAL_MECHANICS = [
+  {
+    name: 'Subhasish Ghosh',
+    email: 'subhasish.ghosh@fixonroad.com',
+    phone: '+91 98302 44109',
+    workshopName: 'FixOnRoad Kalyani Central Auto Hub',
+    vehiclePlate: 'WB-12-AE-4921',
+    vehicleModel: 'Hero Splendor Plus (Service Bike)',
+    specialization: 'Two-Wheeler Engine & Electrical Diagnostics',
+    serviceCategories: ['Flat Tyre / Puncture Repair', 'Battery Jumpstart', 'Emergency Fuel Delivery', 'Minor Engine Breakdown'],
+    serviceRadius: 35,
+    rating: 4.9,
+    upiId: 'subhasish.ghosh@okhdfcbank',
+    currentLocation: { lat: 22.9750, lng: 88.4340 }, // Kalyani
+    city: 'Kalyani, Nadia'
   },
-  Delhi: {
-    lat: [28.52, 28.72],
-    lng: [77.10, 77.32],
-    names: [
-      'Connaught Place', 'Karol Bagh', 'Dwarka Sector 21',
-      'Lajpat Nagar', 'Rohini Sector 9', 'Saket',
-    ],
+  {
+    name: 'Anirban Mukherjee',
+    email: 'anirban.mukherjee@fixonroad.com',
+    phone: '+91 98301 55210',
+    workshopName: 'Kanchrapara Quick Rescue Point',
+    vehiclePlate: 'WB-24-K-8812',
+    vehicleModel: 'Bajaj Pulsar 150 Rapid Unit',
+    specialization: 'Puncture, Tubeless Patch & Wheel Alignment',
+    serviceCategories: ['Flat Tyre / Puncture Repair', 'Chain & Sprocket Repair', 'Emergency Fuel Delivery'],
+    serviceRadius: 30,
+    rating: 4.8,
+    upiId: 'anirban.m@paytm',
+    currentLocation: { lat: 22.9460, lng: 88.4330 }, // Kanchrapara
+    city: 'Kanchrapara, North 24 Parganas'
   },
-  Mumbai: {
-    lat: [18.92, 19.12],
-    lng: [72.82, 72.92],
-    names: [
-      'Andheri West', 'Bandra East', 'Dadar TT Circle',
-      'Powai Hiranandani', 'Goregaon East', 'Malad West',
-    ],
+  {
+    name: 'Debasish Mondal',
+    email: 'debasish.mondal@fixonroad.com',
+    phone: '+91 98303 66321',
+    workshopName: 'Chakdaha Highway Support Station',
+    vehiclePlate: 'WB-16-T-3401',
+    vehicleModel: 'Honda Shine 125 Service Unit',
+    specialization: 'Battery Jumpstart & Electrical Short-Circuit Recovery',
+    serviceCategories: ['Battery Jumpstart', 'Electrical Inspection', 'Emergency Fuel Delivery'],
+    serviceRadius: 35,
+    rating: 4.9,
+    upiId: 'debasish.mondal@upi',
+    currentLocation: { lat: 23.0800, lng: 88.5200 }, // Chakdaha
+    city: 'Chakdaha, Nadia'
   },
-  Bangalore: {
-    lat: [12.90, 13.04],
-    lng: [77.52, 77.68],
-    names: [
-      'Koramangala 4th Block', 'Whitefield ITPL Road',
-      'Indiranagar 100 Feet Road', 'Electronic City Phase 1',
-      'Jayanagar 4th Block', 'HSR Layout Sector 7',
-    ],
+  {
+    name: 'Bikram Roy',
+    email: 'bikram.roy@fixonroad.com',
+    phone: '+91 98304 77432',
+    workshopName: 'Ranaghat NH-12 Rapid Unit',
+    vehiclePlate: 'WB-14-R-5520',
+    vehicleModel: 'TVS Apache RTR 160 Response Bike',
+    specialization: 'Heavy Two-Wheeler & Drive Transmission',
+    serviceCategories: ['Minor Engine Breakdown', 'Two-Wheeler Towing', 'Clutch & Cable Replacement'],
+    serviceRadius: 40,
+    rating: 4.7,
+    upiId: 'bikram.roy@axisbank',
+    currentLocation: { lat: 23.1810, lng: 88.5800 }, // Ranaghat
+    city: 'Ranaghat, Nadia'
   },
-  Chennai: {
-    lat: [13.00, 13.12],
-    lng: [80.20, 80.30],
-    names: [
-      'T. Nagar', 'Anna Nagar', 'Adyar', 'Velachery',
-      'OMR Thoraipakkam', 'Mylapore',
-    ],
+  {
+    name: 'Rajesh Karmakar',
+    email: 'rajesh.karmakar@fixonroad.com',
+    phone: '+91 98305 88543',
+    workshopName: 'Shantipur Auto Garage & Spares',
+    vehiclePlate: 'WB-18-B-6109',
+    vehicleModel: 'Hero Glamour 125 Mobile Unit',
+    specialization: 'Carburetor & Fuel Injection Calibration',
+    serviceCategories: ['Emergency Fuel Delivery', 'Spark Plug & Ignition Fix', 'Flat Tyre / Puncture Repair'],
+    serviceRadius: 35,
+    rating: 4.8,
+    upiId: 'rajesh.karmakar@ybl',
+    currentLocation: { lat: 23.2500, lng: 88.4300 }, // Shantipur
+    city: 'Shantipur, Nadia'
   },
-  Hyderabad: {
-    lat: [17.36, 17.48],
-    lng: [78.38, 78.52],
-    names: [
-      'Banjara Hills Road No. 12', 'Madhapur Hitech City',
-      'Gachibowli', 'Secunderabad Clock Tower',
-      'Kukatpally', 'Ameerpet',
-    ],
+  {
+    name: 'Sourav Banerjee',
+    email: 'sourav.banerjee@fixonroad.com',
+    phone: '+91 98306 99654',
+    workshopName: 'Samudragar Breakdown & Recovery Station',
+    vehiclePlate: 'WB-20-C-9934',
+    vehicleModel: 'Bajaj Discover 125 Service Unit',
+    specialization: 'On-Spot Highway Breakdown Recovery',
+    serviceCategories: ['Flat Tyre / Puncture Repair', 'Battery Jumpstart', 'Minor Engine Breakdown', 'Emergency Fuel Delivery'],
+    serviceRadius: 45,
+    rating: 4.9,
+    upiId: 'sourav.banerjee@icici',
+    currentLocation: { lat: 23.3610, lng: 88.3180 }, // Samudragar
+    city: 'Samudragar, Purba Bardhaman'
   },
-  Pune: {
-    lat: [18.48, 18.58],
-    lng: [73.82, 73.92],
-    names: [
-      'Shivaji Nagar FC Road', 'Hinjewadi Phase 1',
-      'Kothrud', 'Viman Nagar', 'Hadapsar', 'Baner',
-    ],
+  {
+    name: 'Pradip Halder',
+    email: 'pradip.halder@fixonroad.com',
+    phone: '+91 98307 11765',
+    workshopName: 'Naihati Express Care Hub',
+    vehiclePlate: 'WB-12-F-2287',
+    vehicleModel: 'Yamaha FZ-S Rapid Responder',
+    specialization: 'Hydraulic Disc Brake & Suspension Rescue',
+    serviceCategories: ['Brake Fluid & Bleeding', 'Flat Tyre / Puncture Repair', 'Chain & Cable Repair'],
+    serviceRadius: 30,
+    rating: 4.8,
+    upiId: 'pradip.halder@okaxis',
+    currentLocation: { lat: 22.8980, lng: 88.4230 }, // Naihati
+    city: 'Naihati, North 24 Parganas'
   },
-  Jaipur: {
-    lat: [26.85, 26.95],
-    lng: [75.74, 75.84],
-    names: [
-      'C-Scheme', 'Malviya Nagar', 'Vaishali Nagar',
-      'Mansarovar', 'Tonk Road', 'Jagatpura',
-    ],
+  {
+    name: 'Amitabha Sen',
+    email: 'amitabha.sen@fixonroad.com',
+    phone: '+91 98308 22876',
+    workshopName: 'Barrackpore Emergency Assistance Center',
+    vehiclePlate: 'WB-24-M-7411',
+    vehicleModel: 'Honda CB Unicorn 160 Response Unit',
+    specialization: 'Rapid Battery Replacement & Alternator Diagnostics',
+    serviceCategories: ['Battery Jumpstart', 'Emergency Fuel Delivery', 'Minor Engine Breakdown'],
+    serviceRadius: 35,
+    rating: 4.7,
+    upiId: 'amitabha.sen@sbi',
+    currentLocation: { lat: 22.7670, lng: 88.3750 }, // Barrackpore
+    city: 'Barrackpore, North 24 Parganas'
   },
-};
-
-const cityKeys = Object.keys(CITIES);
-
-function randomLocation(city?: string) {
-  const c = city || pick(cityKeys);
-  const info = CITIES[c];
-  return {
-    city: c,
-    lat: randomBetween(info.lat[0], info.lat[1]),
-    lng: randomBetween(info.lng[0], info.lng[1]),
-    address: `${pick(info.names)}, ${c}, India`,
-  };
-}
-
-// ─── Realistic Customer (Driver) Data ─────────────────────────────────────────
-
-const CUSTOMERS = [
-  { name: 'Rupankar Basak', email: 'rupankar.basak@gmail.com', phone: '+919876543210' },
-  { name: 'Arjun Sharma', email: 'arjun.sharma@gmail.com', phone: '+919123456780' },
-  { name: 'Priya Mukherjee', email: 'priya.mukherjee@outlook.com', phone: '+919988776655' },
-  { name: 'Rahul Verma', email: 'rahul.verma@gmail.com', phone: '+919012345678' },
-  { name: 'Sneha Chatterjee', email: 'sneha.chatt@gmail.com', phone: '+918765432109' },
-  { name: 'Amit Patel', email: 'amit.patel.drive@gmail.com', phone: '+917654321098' },
-  { name: 'Deepika Rao', email: 'deepika.rao@yahoo.com', phone: '+916543210987' },
-  { name: 'Vikram Singh', email: 'vikram.singh@gmail.com', phone: '+919234567890' },
-  { name: 'Ananya Das', email: 'ananya.das@outlook.com', phone: '+918901234567' },
-  { name: 'Rohan Gupta', email: 'rohan.gupta99@gmail.com', phone: '+917890123456' },
-  { name: 'Kavita Nair', email: 'kavita.nair@gmail.com', phone: '+916789012345' },
-  { name: 'Suresh Iyer', email: 'suresh.iyer@gmail.com', phone: '+919345678901' },
-  { name: 'Meera Joshi', email: 'meera.joshi@gmail.com', phone: '+918456789012' },
-  { name: 'Aditya Banerjee', email: 'aditya.banerjee@outlook.com', phone: '+917567890123' },
-  { name: 'Pooja Reddy', email: 'pooja.reddy@gmail.com', phone: '+916678901234' },
-  { name: 'Sanjay Kumar', email: 'sanjay.kumar.drv@gmail.com', phone: '+919456789012' },
-  { name: 'Nisha Pillai', email: 'nisha.pillai@yahoo.com', phone: '+918567890123' },
-  { name: 'Karthik Menon', email: 'karthik.menon@gmail.com', phone: '+917678901234' },
-  { name: 'Tanvi Deshmukh', email: 'tanvi.desh@gmail.com', phone: '+916789012340' },
-  { name: 'Rajesh Tiwari', email: 'rajesh.tiwari@gmail.com', phone: '+919567890123' },
+  {
+    name: 'Tanmay Das',
+    email: 'tanmay.das@fixonroad.com',
+    phone: '+91 98309 33987',
+    workshopName: 'Hooghly River Roadside Rescue',
+    vehiclePlate: 'WB-16-D-8032',
+    vehicleModel: 'Suzuki Gixxer 150 Mobile Bike',
+    specialization: 'Comprehensive Multi-Brand Two-Wheeler Inspection',
+    serviceCategories: ['Flat Tyre / Puncture Repair', 'Battery Jumpstart', 'Two-Wheeler Towing', 'Oil Top-up & Fluid Leak Fix'],
+    serviceRadius: 35,
+    rating: 4.9,
+    upiId: 'tanmay.das@paytm',
+    currentLocation: { lat: 22.9030, lng: 88.3970 }, // Hooghly / Chinsurah
+    city: 'Chinsurah, Hooghly'
+  },
+  {
+    name: 'Rakesh Pal',
+    email: 'rakesh.pal@fixonroad.com',
+    phone: '+91 98310 44098',
+    workshopName: 'Krishnanagar Road Care Hub',
+    vehiclePlate: 'WB-14-H-1904',
+    vehicleModel: 'Hero Passion Pro Response Bike',
+    specialization: 'Emergency Towing & Mechanical Recovery',
+    serviceCategories: ['Two-Wheeler Towing', 'Flat Tyre / Puncture Repair', 'Minor Engine Breakdown'],
+    serviceRadius: 40,
+    rating: 4.8,
+    upiId: 'rakesh.pal@hdfcbank',
+    currentLocation: { lat: 23.4000, lng: 88.5000 }, // Krishnanagar
+    city: 'Krishnanagar, Nadia'
+  }
 ];
 
-// ─── Realistic Mechanic Data ──────────────────────────────────────────────────
-
-const SERVICE_CATEGORIES = [
-  'Flat Tyre', 'Engine Repair', 'Battery Jumpstart', 'Oil Change',
-  'Brake Repair', 'Towing', 'AC Repair', 'Clutch Repair',
-  'Suspension Fix', 'General Service',
+// ─── 50 Real Customers with Realistic Bengal Locations ─────────────────────────
+const REAL_CUSTOMERS = [
+  { name: 'Rupankar Basak', city: 'Kalyani', address: 'Block B, Central Park Road, Kalyani, Nadia 741235', lat: 22.9780, lng: 88.4330 },
+  { name: 'Sayan Sengupta', city: 'Kalyani', address: 'Near Kalyani University Gate 1, Nadia 741235', lat: 22.9860, lng: 88.4410 },
+  { name: 'Poulomi Dasgupta', city: 'Kanchrapara', address: 'Railway Colony Road, Kanchrapara, 24 Pgs (N) 743145', lat: 22.9480, lng: 88.4350 },
+  { name: 'Abhishek Chatterjee', city: 'Chakdaha', address: 'Lalpur Road, Near Chakdaha Station, Nadia 741222', lat: 23.0820, lng: 88.5220 },
+  { name: 'Trisha Majumder', city: 'Ranaghat', address: 'Court Road, Ranaghat Sub-Division, Nadia 741201', lat: 23.1790, lng: 88.5780 },
+  { name: 'Arindam Dutta', city: 'Shantipur', address: 'College Road, Shantipur Municipality, Nadia 741404', lat: 23.2480, lng: 88.4320 },
+  { name: 'Sneha Roy', city: 'Samudragar', address: 'Station Bazaar Road, Samudragar, Purba Bardhaman 713519', lat: 23.3610, lng: 88.3180 },
+  { name: 'Ritwik Bhattacharya', city: 'Naihati', address: 'Anandabazar Link Road, Naihati, 24 Pgs (N) 743165', lat: 22.8990, lng: 88.4210 },
+  { name: 'Priyanka Kundu', city: 'Barrackpore', address: 'SN Banerjee Road, Cantonment Area, Barrackpore 700120', lat: 22.7650, lng: 88.3730 },
+  { name: 'Joydeep Ganguly', city: 'Chinsurah', address: 'Pipulpati More, Grand Trunk Road, Hooghly 712101', lat: 22.9010, lng: 88.3950 },
+  { name: 'Moumita Bose', city: 'Bandel', address: 'Bandel Church Road, Hooghly 712123', lat: 22.9190, lng: 88.3840 },
+  { name: 'Souvik Ghosh', city: 'Serampore', address: 'Battala Road, Serampore, Hooghly 712201', lat: 22.7510, lng: 88.3440 },
+  { name: 'Ananya Das', city: 'Krishnanagar', address: 'Nediarpara Main Road, Krishnanagar, Nadia 741101', lat: 23.4020, lng: 88.5020 },
+  { name: 'Deep Sarkar', city: 'Barasat', address: 'Champadali More, Jessore Road, Barasat 700124', lat: 22.7210, lng: 88.4820 },
+  { name: 'Rimpa Mukherjee', city: 'Habra', address: 'Jessore Road Crossing, Habra, 24 Pgs (N) 743263', lat: 22.8340, lng: 88.6320 },
+  { name: 'Nilanjan Chakraborty', city: 'Bhatpara', address: 'Ghoshpara Road, Bhatpara, 24 Pgs (N) 743123', lat: 22.8680, lng: 88.4060 },
+  { name: 'Madhurima Pal', city: 'Titagarh', address: 'BT Road Titagarh Crossing, 24 Pgs (N) 700119', lat: 22.7380, lng: 88.3760 },
+  { name: 'Subhajit Saha', city: 'Khardah', address: 'Khardah Station Road, 24 Pgs (N) 700117', lat: 22.7190, lng: 88.3790 },
+  { name: 'Swagata Paul', city: 'Sodepur', address: 'Station Road, Sodepur, Kolkata 700110', lat: 22.6990, lng: 88.3880 },
+  { name: 'Indranil Mitra', city: 'Belgharia', address: 'Feeder Road, Belgharia, Kolkata 700056', lat: 22.6630, lng: 88.3850 },
+  { name: 'Tanushree Ghosh', city: 'Dum Dum', address: 'Dum Dum Cantonment Station Road, Kolkata 700065', lat: 22.6390, lng: 88.4180 },
+  { name: 'Koushik Dey', city: 'Salt Lake', address: 'Sector V Ring Road, Salt Lake, Kolkata 700091', lat: 22.5830, lng: 88.4310 },
+  { name: 'Payel Banerjee', city: 'New Town', address: 'Action Area II Main Arterial Road, New Town 700156', lat: 22.6010, lng: 88.4680 },
+  { name: 'Rahul Sharma', city: 'Kolkata', address: 'Park Street Cross, Kolkata 700016', lat: 22.5510, lng: 88.3520 },
+  { name: 'Debolina Sen', city: 'Howrah', address: 'Foreshore Road, Shibpur, Howrah 711102', lat: 22.5710, lng: 88.3240 },
+  { name: 'Aakash Verma', city: 'Kalyani', address: 'Simanta Expressway Junction, Kalyani 741235', lat: 22.9690, lng: 88.4280 },
+  { name: 'Megha Agarwal', city: 'Kalyani', address: 'A-Block Market Area, Kalyani 741235', lat: 22.9790, lng: 88.4380 },
+  { name: 'Sandip Das', city: 'Kanchrapara', address: 'Workshop Gate No 3, Kanchrapara 743145', lat: 22.9430, lng: 88.4310 },
+  { name: 'Pallabi Roy', city: 'Chakdaha', address: 'NH-12 Bypass Overbridge, Chakdaha 741222', lat: 23.0760, lng: 88.5170 },
+  { name: 'Siddhartha Guha', city: 'Ranaghat', address: 'Happy Club More, Ranaghat 741201', lat: 23.1830, lng: 88.5830 },
+  { name: 'Shreya Nandi', city: 'Shantipur', address: 'Sutragarh Handloom Cluster, Shantipur 741404', lat: 23.2420, lng: 88.4250 },
+  { name: 'Arijit Pramanik', city: 'Samudragar', address: 'Bhagirathi Ferry Ghat Road, Samudragar 713519', lat: 23.3640, lng: 88.3150 },
+  { name: 'Sudip Mondal', city: 'Kalna', address: '108 Shiva Temple Road, Kalna, Purba Bardhaman 713409', lat: 23.2210, lng: 88.3680 },
+  { name: 'Dipika Halder', city: 'Naihati', address: 'Bhatpara Border Link Road, Naihati 743165', lat: 22.8940, lng: 88.4190 },
+  { name: 'Rohan Gupta', city: 'Barrackpore', address: 'Wireless More, Barrackpore 700120', lat: 22.7720, lng: 88.3810 },
+  { name: 'Bipasha Roy', city: 'Chinsurah', address: 'Tolafatak Road, Chinsurah 712101', lat: 22.8980, lng: 88.3910 },
+  { name: 'Prasenjit Karmakar', city: 'Bandel', address: 'Debanandapur Road, Bandel 712123', lat: 22.9230, lng: 88.3790 },
+  { name: 'Kavita Mishra', city: 'Serampore', address: 'College Ghat Road, Serampore 712201', lat: 22.7540, lng: 88.3480 },
+  { name: 'Tuhin Mukherjee', city: 'Krishnanagar', address: 'Ghurni Clay Doll Colony, Krishnanagar 741101', lat: 23.4080, lng: 88.5080 },
+  { name: 'Sampa Ghosh', city: 'Barasat', address: 'Kachhari Maidan Road, Barasat 700124', lat: 22.7240, lng: 88.4860 },
+  { name: 'Animesh Das', city: 'Habra', address: 'Banipur ITI Campus Road, Habra 743263', lat: 22.8390, lng: 88.6380 },
+  { name: 'Sumana Bhattacharya', city: 'Khardah', address: 'Rahara Bazaar More, Khardah 700118', lat: 22.7240, lng: 88.3830 },
+  { name: 'Rajdeep Sen', city: 'Sodepur', address: 'Amrabati Housing Link, Sodepur 700110', lat: 22.7020, lng: 88.3920 },
+  { name: 'Sohini Paul', city: 'Kolkata', address: 'Lake Gardens, Southern Avenue, Kolkata 700045', lat: 22.5050, lng: 88.3610 },
+  { name: 'Vikramjit Singh', city: 'Salt Lake', address: 'Karunamoyee Central Park, Salt Lake 700091', lat: 22.5880, lng: 88.4230 },
+  { name: 'Pooja Jha', city: 'New Town', address: 'Chinar Park Crossing, Rajarhat 700136', lat: 22.6280, lng: 88.4480 },
+  { name: 'Ratan Das', city: 'Kalyani', address: 'Buddha Park Sector, Kalyani 741235', lat: 22.9730, lng: 88.4310 },
+  { name: 'Manish Pandey', city: 'Ranaghat', address: 'Gournibas Road, Ranaghat 741201', lat: 23.1760, lng: 88.5740 },
+  { name: 'Ananya Roy', city: 'Barrackpore', address: 'Orderly Bazaar, Barrackpore Cantonment 700120', lat: 22.7680, lng: 88.3780 },
+  { name: 'Debjit Biswas', city: 'Kanchrapara', address: 'Bag More, Kanchrapara 743145', lat: 22.9510, lng: 88.4380 }
 ];
 
-const SPECIALIZATIONS = [
-  'Two-Wheeler Specialist', 'Four-Wheeler Specialist',
-  'Diesel Engine Expert', 'EV & Hybrid Specialist',
-  'Heavy Vehicle Specialist', 'Multi-Brand Specialist',
-  'Luxury Car Specialist', 'Commercial Vehicle Expert',
+// Service catalog for seeding realistic orders
+const SERVICE_CATALOG = [
+  { serviceType: 'flat-tyre', name: 'Flat Tyre / Puncture Repair', basePrice: 299 },
+  { serviceType: 'battery-jumpstart', name: 'Battery Jumpstart & Boost', basePrice: 349 },
+  { serviceType: 'fuel-delivery', name: 'Emergency Fuel Delivery', basePrice: 249 },
+  { serviceType: 'minor-repair', name: 'Minor Mechanical Breakdown', basePrice: 399 },
+  { serviceType: 'towing', name: 'Rapid Two-Wheeler Towing', basePrice: 799 }
 ];
 
-const MECHANICS_DATA = [
-  {
-    name: 'Rajendra Mondal',
-    email: 'rajendra.mechanic@gmail.com',
-    phone: '+919800112233',
-    workshopName: 'Mondal Auto Works',
-    city: 'Kolkata',
-    vehiclePlate: 'WB-06-AK-4521',
-    upiId: 'rajendramondal@upi',
-  },
-  {
-    name: 'Sunil Yadav',
-    email: 'sunil.yadav.mech@gmail.com',
-    phone: '+919811223344',
-    workshopName: 'Yadav Motor Garage',
-    city: 'Delhi',
-    vehiclePlate: 'DL-4C-BJ-7892',
-    upiId: 'sunilyadav@paytm',
-  },
-  {
-    name: 'Mohammed Irfan',
-    email: 'irfan.autocare@gmail.com',
-    phone: '+919822334455',
-    workshopName: 'Irfan Auto Care',
-    city: 'Mumbai',
-    vehiclePlate: 'MH-02-CD-3456',
-    upiId: 'irfanauto@upi',
-  },
-  {
-    name: 'Venkatesh Murthy',
-    email: 'venkatesh.murthy@gmail.com',
-    phone: '+919833445566',
-    workshopName: 'Murthy Motors',
-    city: 'Bangalore',
-    vehiclePlate: 'KA-01-EF-6789',
-    upiId: 'venkatesh.m@ybl',
-  },
-  {
-    name: 'Balasubramanian K',
-    email: 'bala.kmech@gmail.com',
-    phone: '+919844556677',
-    workshopName: 'Bala Two-Wheeler Clinic',
-    city: 'Chennai',
-    vehiclePlate: 'TN-09-GH-1234',
-    upiId: 'balak@upi',
-  },
-  {
-    name: 'Ganesh Reddy',
-    email: 'ganesh.reddy.repair@gmail.com',
-    phone: '+919855667788',
-    workshopName: 'Reddy Road Rescue',
-    city: 'Hyderabad',
-    vehiclePlate: 'TS-08-IJ-5678',
-    upiId: 'ganeshreddy@gpay',
-  },
-  {
-    name: 'Prakash Jadhav',
-    email: 'prakash.jadhav@gmail.com',
-    phone: '+919866778899',
-    workshopName: 'Jadhav Car Hospital',
-    city: 'Pune',
-    vehiclePlate: 'MH-12-KL-9012',
-    upiId: 'prakashj@phonepe',
-  },
-  {
-    name: 'Hemant Meena',
-    email: 'hemant.meena.auto@gmail.com',
-    phone: '+919877889900',
-    workshopName: 'Meena Tyre & Auto',
-    city: 'Jaipur',
-    vehiclePlate: 'RJ-14-MN-3456',
-    upiId: 'hemantmeena@upi',
-  },
-  {
-    name: 'Debashis Roy',
-    email: 'debashis.roy.mech@gmail.com',
-    phone: '+919888990011',
-    workshopName: 'Roy Express Garage',
-    city: 'Kolkata',
-    vehiclePlate: 'WB-02-OP-7890',
-    upiId: 'debashisroy@paytm',
-  },
-  {
-    name: 'Manoj Pandey',
-    email: 'manoj.pandey.fix@gmail.com',
-    phone: '+919899001122',
-    workshopName: 'Pandey Quick Fix',
-    city: 'Delhi',
-    vehiclePlate: 'DL-8S-QR-2345',
-    upiId: 'manojpandey@ybl',
-  },
-  {
-    name: 'Abdul Rehman',
-    email: 'abdul.rehman.auto@gmail.com',
-    phone: '+919900112233',
-    workshopName: 'AR Auto Solutions',
-    city: 'Mumbai',
-    vehiclePlate: 'MH-04-ST-6789',
-    upiId: 'abdulrehman@upi',
-  },
-  {
-    name: 'Nagaraj Shetty',
-    email: 'nagaraj.shetty@gmail.com',
-    phone: '+919911223344',
-    workshopName: 'Shetty EV Service',
-    city: 'Bangalore',
-    vehiclePlate: 'KA-05-UV-0123',
-    upiId: 'nagaraj.s@gpay',
-  },
-  {
-    name: 'Selvakumar P',
-    email: 'selva.kumar.auto@gmail.com',
-    phone: '+919922334455',
-    workshopName: 'Selva Diesel Experts',
-    city: 'Chennai',
-    vehiclePlate: 'TN-07-WX-4567',
-    upiId: 'selvakumar@phonepe',
-  },
-  {
-    name: 'Ravi Teja Goud',
-    email: 'raviteja.goud@gmail.com',
-    phone: '+919933445566',
-    workshopName: 'Teja Road Assist',
-    city: 'Hyderabad',
-    vehiclePlate: 'TS-10-YZ-8901',
-    upiId: 'ravitejag@upi',
-  },
-  {
-    name: 'Sachin Bhosale',
-    email: 'sachin.bhosale.mech@gmail.com',
-    phone: '+919944556677',
-    workshopName: 'Bhosale Motor Hub',
-    city: 'Pune',
-    vehiclePlate: 'MH-14-AB-2345',
-    upiId: 'sachinb@ybl',
-  },
-];
+const ORDER_STATUSES = ['COMPLETED', 'CONFIRMED', 'PAID', 'EN_ROUTE', 'MECHANIC_ASSIGNED', 'ARRIVED', 'PENDING'];
 
-// ─── Service Types & Pricing ──────────────────────────────────────────────────
+export async function runSeed() {
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('🚀 FixOnRoad MongoDB Atlas Realistic Seeding Pipeline');
+  console.log('═══════════════════════════════════════════════════════════════\n');
 
-const SERVICE_TYPES = [
-  { serviceType: 'Flat Tyre Fix', basePrice: 250 },
-  { serviceType: 'Battery Jumpstart', basePrice: 400 },
-  { serviceType: 'Engine Diagnostic', basePrice: 800 },
-  { serviceType: 'Oil Change', basePrice: 600 },
-  { serviceType: 'Brake Pad Replacement', basePrice: 1200 },
-  { serviceType: 'Towing (up to 10 km)', basePrice: 1500 },
-  { serviceType: 'AC Gas Refill', basePrice: 1800 },
-  { serviceType: 'Clutch Cable Replacement', basePrice: 900 },
-  { serviceType: 'Spark Plug Replacement', basePrice: 350 },
-  { serviceType: 'General Health Check-up', basePrice: 500 },
-];
-
-const ORDER_STATUSES = [
-  'PENDING', 'CONFIRMED', 'MECHANIC_ASSIGNED', 'EN_ROUTE',
-  'ARRIVED', 'COMPLETED', 'EXPIRED', 'PAID', 'FAILED',
-] as const;
-
-const PAYMENT_METHODS = ['cod', 'razorpay', 'upi', 'card', 'netbanking'] as const;
-
-// ─── Seed Function ────────────────────────────────────────────────────────────
-
-async function seed() {
   console.log('🔌 Connecting to MongoDB Atlas...');
   await mongoose.connect(MONGO_URI);
-  console.log('✅ Connected!\n');
+  console.log('✅ Successfully connected to MongoDB Atlas.\n');
 
-  const db = mongoose.connection.db!;
+  // ─── 1. Complete Database Wipe ──────────────────────────────────────────────
+  console.log('🧹 Clearing existing collections (User, Mechanic, Order)...');
+  const deletedOrders = await Order.deleteMany({});
+  const deletedMechanics = await Mechanic.deleteMany({});
+  const deletedUsers = await User.deleteMany({});
+  console.log(`   ✓ Removed ${deletedOrders.deletedCount} orders`);
+  console.log(`   ✓ Removed ${deletedMechanics.deletedCount} mechanics`);
+  console.log(`   ✓ Removed ${deletedUsers.deletedCount} users\n`);
 
-  // ── Step 0: Drop stale indexes if present ───────────────────────────────────
-  try {
-    const indexes = await db.collection('mechanics').indexes();
-    const staleIdx = indexes.find((idx: any) => idx.name === 'userId_1');
-    if (staleIdx) {
-      await db.collection('mechanics').dropIndex('userId_1');
-      console.log('🧹 Dropped stale userId_1 index on mechanics.\n');
-    }
-  } catch (e: any) {
-    // Ignore if collection does not exist yet
-  }
-
-  // ── 1. Seed Customers ───────────────────────────────────────────────────────
-  console.log('👤 Seeding 20 customers (drivers)...');
-  const customerDocs = [];
-  for (const c of CUSTOMERS) {
-    const loc = randomLocation();
-    const existing = await User.findOne({ email: c.email });
-    if (existing) {
-      console.log(`   ⏭  ${c.name} already exists, skipping.`);
-      customerDocs.push(existing);
-      continue;
-    }
-    const user = await User.create({
-      name: c.name,
-      email: c.email,
-      password: DEFAULT_PWD,
-      phone: c.phone,
-      role: 'customer',
-      savedLocations: [loc.address],
-    });
-    customerDocs.push(user);
-    console.log(`   ✅ ${c.name}  (${loc.city})`);
-  }
-
-  // ── 2. Seed Mechanics ───────────────────────────────────────────────────────
-  console.log('\n🔧 Seeding 15 mechanics...');
-  const mechanicDocs = [];
-  for (let i = 0; i < MECHANICS_DATA.length; i++) {
-    const m = MECHANICS_DATA[i];
-    const loc = randomLocation(m.city);
-
-    const existing = await Mechanic.findOne({ email: m.email });
-    if (existing) {
-      console.log(`   ⏭  ${m.name} already exists, skipping.`);
-      mechanicDocs.push(existing);
-      continue;
-    }
-
-    // Pick 2-4 random service categories
-    const numCats = 2 + Math.floor(Math.random() * 3);
-    const cats = [...SERVICE_CATEGORIES].sort(() => Math.random() - 0.5).slice(0, numCats);
-
-    const mechanic = await Mechanic.create({
-      name: m.name,
-      email: m.email,
-      password: DEFAULT_PWD,
-      phone: m.phone,
+  // ─── 2. Seed 10 Mechanics ──────────────────────────────────────────────────
+  console.log('🔧 Seeding 10 Verified Mechanics across Bengal Hubs...');
+  const mechanicDocs: any[] = [];
+  for (const mech of REAL_MECHANICS) {
+    const created = await Mechanic.create({
+      name: mech.name,
+      email: mech.email,
+      password: DEFAULT_PASSWORD,
+      phone: mech.phone,
       role: 'mechanic',
-      workshopName: m.workshopName,
-      serviceCategories: cats,
-      specialization: pick(SPECIALIZATIONS),
-      serviceRadius: pick([5, 8, 10, 12, 15, 20]),
-      vehiclePlate: m.vehiclePlate,
-      upiId: m.upiId,
-      isAvailable: Math.random() > 0.3, // ~70% available
-      rating: +(3.5 + Math.random() * 1.5).toFixed(1), // 3.5 – 5.0
-      currentLocation: { lat: loc.lat, lng: loc.lng },
+      workshopName: mech.workshopName,
+      serviceCategories: mech.serviceCategories,
+      specialization: mech.specialization,
+      serviceRadius: mech.serviceRadius,
+      vehiclePlate: mech.vehiclePlate,
+      upiId: mech.upiId,
+      isAvailable: true,
+      rating: mech.rating,
+      currentLocation: mech.currentLocation
     });
-    mechanicDocs.push(mechanic);
-    console.log(`   ✅ ${m.name}  @ ${m.workshopName}  (${m.city})`);
+    mechanicDocs.push(created);
+    console.log(`   ✅ [Mechanic] ${created.name} | ${mech.vehiclePlate} | Hub: ${mech.workshopName} (${mech.city})`);
   }
+  console.log(`\n🎉 Seeded ${mechanicDocs.length} mechanics successfully.\n`);
 
-  // ── 3. Seed Orders ─────────────────────────────────────────────────────────
-  console.log('\n📋 Seeding 30 orders...');
-  for (let i = 0; i < 30; i++) {
-    const customer = pick(customerDocs);
-    const mechanic = pick(mechanicDocs);
-    const svc = pick(SERVICE_TYPES);
-    const loc = randomLocation();
+  // ─── 3. Seed 50 Customers/Users ────────────────────────────────────────────
+  console.log('👥 Seeding 50 Real Customers across Bengal...');
+  const userDocs: any[] = [];
+  for (let i = 0; i < REAL_CUSTOMERS.length; i++) {
+    const cust = REAL_CUSTOMERS[i];
+    const emailNum = i + 1;
+    // Create realistic email
+    const nameSlug = cust.name.toLowerCase().replace(/\s+/g, '.');
+    const email = i === 0 ? 'rupankar.basak@gmail.com' : `${nameSlug}.${emailNum}@example.com`;
+    const phone = `+91 98300 ${String(emailNum).padStart(5, '0')}`;
 
-    const gst = +(svc.basePrice * 0.18).toFixed(2);
-    const platformFee = +(svc.basePrice * 0.05).toFixed(2);
-    const totalAmount = +(svc.basePrice + gst + platformFee).toFixed(2);
+    const createdUser = await User.create({
+      name: cust.name,
+      email,
+      password: DEFAULT_PASSWORD,
+      phone,
+      role: 'customer',
+      savedLocations: [cust.address]
+    });
+    userDocs.push({ ...createdUser.toObject(), locationCoords: { lat: cust.lat, lng: cust.lng, address: cust.address } });
+    if ((i + 1) % 10 === 0 || i === 0) {
+      console.log(`   ✅ [User #${i + 1}] ${cust.name} (${cust.city}) - ${email}`);
+    }
+  }
+  console.log(`\n🎉 Seeded ${userDocs.length} real customers successfully.\n`);
 
-    const status = pick(ORDER_STATUSES);
-    const paymentMethod = pick(PAYMENT_METHODS);
+  // ─── 4. Seed Realistic Orders with 16-Char Cryptographic Tracking Codes ────
+  console.log('📋 Seeding 25 Orders with 16-Character Tracking Codes (FOR-XXXXXXXXXXXXXXXX)...');
+  const seededOrders: any[] = [];
 
-    // Expired orders get an expiresAt in the past
-    const expiresAt =
-      status === 'EXPIRED'
-        ? new Date(Date.now() - Math.floor(Math.random() * 7 * 86400000))
-        : status === 'PENDING'
-        ? new Date(Date.now() + 30 * 60000) // 30 min from now
-        : undefined;
+  for (let i = 0; i < 25; i++) {
+    const user = userDocs[i % userDocs.length];
+    // Dynamically rotate mechanics across orders to guarantee distribution
+    const assignedMech = mechanicDocs[i % mechanicDocs.length];
+    const service = SERVICE_CATALOG[i % SERVICE_CATALOG.length];
+    const status = ORDER_STATUSES[i % ORDER_STATUSES.length];
+
+    const gst = Math.round(service.basePrice * 0.18 * 100) / 100;
+    const platformFee = 25;
+    const totalAmount = service.basePrice + gst + platformFee;
+
+    const userLoc = user.locationCoords || { lat: 23.3610, lng: 88.3180, address: 'Samudragar Breakdown Spot' };
+    const mechLoc = assignedMech.currentLocation || { lat: 22.9750, lng: 88.4340 };
+
+    // Compute real road distance & two-wheeler realistic duration
+    const routeData = await getRoadRoute(
+      { lat: mechLoc.lat, lng: mechLoc.lng },
+      { lat: userLoc.lat, lng: userLoc.lng }
+    );
+
+    // Cryptographically secure 16-character alphanumeric tracking code
+    const trackingCode = generateOrderCode();
 
     const order = await Order.create({
-      userId: customer._id,
-      mechanicId: ['PENDING', 'EXPIRED', 'FAILED'].includes(status)
-        ? undefined
-        : mechanic._id,
+      userId: user._id,
+      mechanicId: status === 'PENDING' ? undefined : assignedMech._id,
+      orderCode: trackingCode,
+      trackingCode,
       serviceDetails: {
-        serviceType: svc.serviceType,
-        basePrice: svc.basePrice,
+        serviceType: service.serviceType,
+        basePrice: service.basePrice,
         gst,
         platformFee,
-        totalAmount,
+        totalAmount
       },
       location: {
-        lat: loc.lat,
-        lng: loc.lng,
-        address: loc.address,
+        lat: userLoc.lat,
+        lng: userLoc.lng,
+        address: userLoc.address
       },
       status,
-      paymentMethod,
-      razorpayOrderId:
-        paymentMethod === 'razorpay'
-          ? `order_${Date.now().toString(36)}${i}`
-          : undefined,
-      expiresAt,
+      paymentMethod: i % 2 === 0 ? 'cod' : 'razorpay',
+      roadDistanceKm: routeData.distanceKm,
+      estimatedDurationMin: routeData.durationMinutes,
+      routePolyline: routeData.coordinates,
+      routingEngine: routeData.source,
+      expiresAt: new Date(Date.now() + (i + 1) * 3600000)
     });
 
-    console.log(
-      `   ✅ Order #${i + 1}  ${svc.serviceType}  ₹${totalAmount}  [${status}]  ${customer.name} → ${
-        order.mechanicId ? mechanic.name : '(unassigned)'
-      }`
-    );
+    seededOrders.push(order);
+    console.log(`   ✅ [Order #${i + 1}] ${trackingCode} | ₹${totalAmount} | ${status} | Cust: ${user.name} → Mech: ${status === 'PENDING' ? '(Searching...)' : assignedMech.name} (${routeData.distanceKm} km, ~${routeData.durationMinutes} min)`);
   }
 
-  console.log('\n🎉 Seeding complete!');
-  console.log(`   📊  ${customerDocs.length} customers`);
-  console.log(`   🔧  ${mechanicDocs.length} mechanics`);
-  console.log(`   📋  30 orders\n`);
+  console.log('\n═══════════════════════════════════════════════════════════════');
+  console.log('🎯 Seeding Complete Summary:');
+  console.log(`   • 10 Verified Bengal Mechanics (All Available)`);
+  console.log(`   • 50 Real Customers (Bengal Regions)`);
+  console.log(`   • 25 Orders with 16-Char Cryptographic Tracking Codes (FOR-...)`);
+  console.log(`   • Sample Tracking URL: /track/${seededOrders[0].trackingCode}`);
+  console.log('═══════════════════════════════════════════════════════════════\n');
 
   await mongoose.disconnect();
-  console.log('🔌 Disconnected from MongoDB.');
+  console.log('🔌 Disconnected from MongoDB Atlas.');
 }
 
-seed().catch((err) => {
-  console.error('❌ Seed failed:', err);
-  process.exit(1);
-});
+if (process.argv[1] && process.argv[1].includes('seed')) {
+  runSeed().catch((err) => {
+    console.error('❌ Seeding pipeline error:', err);
+    process.exit(1);
+  });
+}

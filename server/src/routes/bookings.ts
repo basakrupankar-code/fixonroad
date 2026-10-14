@@ -244,11 +244,12 @@ router.post('/', requireAuth, async (req: any, res: any, next) => {
 
     const routeData = await getRoadRoute(originCoords, destCoords);
 
-    // 3. Create unique order with human-readable tracking code
+    // 3. Create unique order with 16-character cryptographic tracking code
     const orderCode = generateOrderCode();
     const newOrder = await Order.create({
       userId: req.user._id,
       orderCode,
+      trackingCode: orderCode,
       mechanicId,
       serviceDetails,
       location,
@@ -341,21 +342,37 @@ router.get('/', requireAuth, async (req: any, res: any, next) => {
   }
 });
 
+// Route geometry endpoint for reliable road network calculation (avoids browser CORS/rate-limits)
+router.get('/route-geometry', async (req: any, res: any, next) => {
+  try {
+    const originLat = Number(req.query.originLat) || 22.975;
+    const originLng = Number(req.query.originLng) || 88.434;
+    const destLat = Number(req.query.destLat) || 23.361;
+    const destLng = Number(req.query.destLng) || 88.318;
+    const route = await getRoadRoute({ lat: originLat, lng: originLng }, { lat: destLat, lng: destLng });
+    res.json(route);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:id', optionalAuth, async (req: any, res: any, next) => {
   try {
     const { id } = req.params;
     
-    // Support lookup by either MongoDB ObjectId or human-readable orderCode (e.g. FOR-XXXXXX)
+    // Support lookup by MongoDB ObjectId, orderCode, or trackingCode
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
-    const query = isObjectId ? { _id: id } : { orderCode: id.toUpperCase() };
+    const query = isObjectId 
+      ? { _id: id } 
+      : { $or: [{ orderCode: id.toUpperCase() }, { trackingCode: id.toUpperCase() }] };
 
     let booking = await Order.findOne(query).populate('mechanicId');
     if (!booking) {
       return res.status(404).json({ error: { message: 'Booking not found' } });
     }
 
-    // If routePolyline is missing on existing order, dynamically compute & backfill it
-    if (!booking.routePolyline || booking.routePolyline.length === 0) {
+    // If routePolyline is missing or empty or a 2-point straight line, dynamically compute & backfill it
+    if (!booking.routePolyline || booking.routePolyline.length <= 2 || !booking.roadDistanceKm) {
       const mechLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.975, lng: 88.434 };
       const destLocation = booking.location || { lat: 23.361, lng: 88.318 };
       const routeData = await getRoadRoute(
@@ -369,11 +386,13 @@ router.get('/:id', optionalAuth, async (req: any, res: any, next) => {
       if (!booking.orderCode) {
         booking.orderCode = generateOrderCode();
       }
+      booking.trackingCode = booking.orderCode;
       await booking.save();
     }
 
     const bookingData = booking.toObject ? booking.toObject() : { ...booking };
-    bookingData.trackingCode = booking.orderCode || `FOR-${booking._id.toString().slice(0, 8).toUpperCase()}`;
+    bookingData.trackingCode = booking.trackingCode || booking.orderCode || `FOR-${booking._id.toString().slice(0, 8).toUpperCase()}`;
+    bookingData.orderCode = bookingData.trackingCode;
     bookingData.hubLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.975, lng: 88.434 };
 
     res.json(bookingData);

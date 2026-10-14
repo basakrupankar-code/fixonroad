@@ -56,8 +56,8 @@ export async function assignRandomAvailableMechanic(
       .sort((a, b) => (a.dist ?? 9999) - (b.dist ?? 9999));
 
     if (withDistance.length > 0) {
-      // Pick randomly among top 3 closest to distribute load fairly while maintaining proximity
-      const poolSize = Math.min(withDistance.length, 3);
+      // Pick randomly among closest candidates to distribute load fairly across mechanics
+      const poolSize = Math.min(withDistance.length, Math.max(3, Math.min(withDistance.length, 5)));
       const chosenIndex = Math.floor(Math.random() * poolSize);
       return withDistance[chosenIndex].mech;
     }

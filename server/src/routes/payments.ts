@@ -160,6 +160,7 @@ router.post('/create-order', requireAuth, async (req, res, next) => {
       order = await Order.create({
         userId: effectiveUserId,
         orderCode,
+        trackingCode: orderCode,
         mechanicId: assignedMechanicId,
         serviceDetails: {
           serviceType: parsed.serviceType,

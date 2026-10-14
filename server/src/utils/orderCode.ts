@@ -1,11 +1,11 @@
 import crypto from 'crypto';
 
 /**
- * Generates an unambiguous, human-readable unique order code.
- * Format: FOR-XXXXXX (e.g., FOR-8F3A2C)
- * Uses uppercase hexadecimal to avoid confusing ambiguous characters.
+ * Generates a cryptographically secure 16-character uppercase alphanumeric tracking code.
+ * Format: FOR-XXXXXXXXXXXXXXXX (e.g., FOR-A3E7B891F4C20D6E)
  */
 export function generateOrderCode(): string {
-  const randomChars = crypto.randomBytes(3).toString('hex').toUpperCase();
-  return `FOR-${randomChars}`;
+  // Generates clean 16-character random hex (8 random bytes = 16 hex characters)
+  const rawHex16 = crypto.randomBytes(8).toString('hex').toUpperCase();
+  return `FOR-${rawHex16}`;
 }
