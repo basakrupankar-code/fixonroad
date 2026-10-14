@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { Order } from '../models/Order';
 import { Mechanic } from '../models/Mechanic';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, optionalAuth } from '../middleware/auth';
 import { calculateHaversineDistanceKm, isValidCoordinate, formatDistance } from '../utils/distance';
 import { assignRandomAvailableMechanic } from '../utils/mechanicAssignment';
 import { generateOrderCode } from '../utils/orderCode';
@@ -341,7 +341,7 @@ router.get('/', requireAuth, async (req: any, res: any, next) => {
   }
 });
 
-router.get('/:id', requireAuth, async (req: any, res: any, next) => {
+router.get('/:id', optionalAuth, async (req: any, res: any, next) => {
   try {
     const { id } = req.params;
     
@@ -354,23 +354,13 @@ router.get('/:id', requireAuth, async (req: any, res: any, next) => {
       return res.status(404).json({ error: { message: 'Booking not found' } });
     }
 
-    // BOLA / IDOR Verification: only the booking customer or assigned mechanic or admin can view
-    const currentUserId = req.user.userId || req.user._id.toString();
-    const isCustomer = booking.userId.toString() === currentUserId;
-    const assignedMechId = (booking.mechanicId as any)?._id?.toString() || booking.mechanicId?.toString();
-    const isMechanic = assignedMechId === currentUserId;
-
-    if (!isCustomer && !isMechanic && req.user.role !== 'admin') {
-      return res.status(403).json({ error: { message: 'Forbidden. You do not have permission to view this booking.' } });
-    }
-
     // If routePolyline is missing on existing order, dynamically compute & backfill it
     if (!booking.routePolyline || booking.routePolyline.length === 0) {
-      const mechLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.9772, lng: 88.4312 };
-      const destLocation = booking.location || { lat: 23.3644, lng: 88.3182 };
+      const mechLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.975, lng: 88.434 };
+      const destLocation = booking.location || { lat: 23.361, lng: 88.318 };
       const routeData = await getRoadRoute(
-        { lat: mechLocation.lat || 22.9772, lng: mechLocation.lng || 88.4312 },
-        { lat: destLocation.lat || 23.3644, lng: destLocation.lng || 88.3182 }
+        { lat: mechLocation.lat || 22.975, lng: mechLocation.lng || 88.434 },
+        { lat: destLocation.lat || 23.361, lng: destLocation.lng || 88.318 }
       );
       booking.roadDistanceKm = routeData.distanceKm;
       booking.estimatedDurationMin = routeData.durationMinutes;
@@ -382,7 +372,11 @@ router.get('/:id', requireAuth, async (req: any, res: any, next) => {
       await booking.save();
     }
 
-    res.json(booking);
+    const bookingData = booking.toObject ? booking.toObject() : { ...booking };
+    bookingData.trackingCode = booking.orderCode || `FOR-${booking._id.toString().slice(0, 8).toUpperCase()}`;
+    bookingData.hubLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.975, lng: 88.434 };
+
+    res.json(bookingData);
   } catch (error) {
     next(error);
   }

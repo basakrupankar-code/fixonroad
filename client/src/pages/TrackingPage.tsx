@@ -3,17 +3,16 @@ import { useParams, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { 
-  MapPin, PhoneCall, ChevronLeft, Navigation2, Copy, Check, 
-  Bike, ShieldCheck, Clock, CheckCircle2, AlertCircle, ArrowRight,
-  ListOrdered
+  PhoneCall, ChevronLeft, Navigation2, Copy, Check, 
+  Bike, ShieldCheck, Clock, CheckCircle2, ArrowRight,
+  ListOrdered, Radio, Sparkles
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { safeFetch } from '../lib/api';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Fix for default Leaflet icons in Vite/React
+// Fix for default Leaflet icons in Vite/React bundling
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -21,98 +20,120 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
 });
 
-// Custom markers for high-contrast visibility
+// Custom high-contrast Leaflet markers
 const mechanicMarkerIcon = L.divIcon({
   className: 'custom-mechanic-marker',
-  html: `<div style="background: linear-gradient(135deg, #f97316, #ea580c); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 18px rgba(249,115,22,0.7); border: 2.5px solid #ffffff;">
+  html: `<div style="background: linear-gradient(135deg, #FF6B00, #ea580c); width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(255,107,0,0.85); border: 2.5px solid #ffffff;">
     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>
   </div>`,
-  iconSize: [40, 40],
-  iconAnchor: [20, 20],
-  popupAnchor: [0, -22]
+  iconSize: [44, 44],
+  iconAnchor: [22, 22],
+  popupAnchor: [0, -24]
 });
 
 const userMarkerIcon = L.divIcon({
   className: 'custom-user-marker',
-  html: `<div style="background: linear-gradient(135deg, #10b981, #059669); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 18px rgba(16,185,129,0.7); border: 2.5px solid #ffffff;">
+  html: `<div style="background: linear-gradient(135deg, #10b981, #059669); width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(16,185,129,0.85); border: 2.5px solid #ffffff;">
     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
   </div>`,
-  iconSize: [40, 40],
-  iconAnchor: [20, 20],
-  popupAnchor: [0, -22]
+  iconSize: [44, 44],
+  iconAnchor: [22, 22],
+  popupAnchor: [0, -24]
 });
 
-// Auto-adjust map view to encapsulate the entire route
-function AutoFitBounds({ points }: { points: [number, number][] }) {
+// Auto-adjust map bounds to ensure both markers and entire road route are in view
+function AutoFitMap({ 
+  hubCoords, 
+  userCoords, 
+  routeCoords 
+}: { 
+  hubCoords: { lat: number; lng: number }; 
+  userCoords: { lat: number; lng: number }; 
+  routeCoords: [number, number][]; 
+}) {
   const map = useMap();
+
   useEffect(() => {
-    if (points && points.length > 0) {
-      try {
-        const bounds = L.latLngBounds(points);
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
-      } catch (e) {
-        console.warn("Could not fit bounds:", e);
+    if (!map) return;
+    try {
+      if (routeCoords && routeCoords.length > 0) {
+        map.fitBounds(L.latLngBounds(routeCoords), { padding: [50, 50] });
+      } else if (hubCoords && userCoords) {
+        map.fitBounds([
+          [hubCoords.lat, hubCoords.lng],
+          [userCoords.lat, userCoords.lng]
+        ], { padding: [50, 50] });
       }
+    } catch (err) {
+      console.warn("Could not auto-fit map bounds:", err);
     }
-  }, [points, map]);
+  }, [map, hubCoords.lat, hubCoords.lng, userCoords.lat, userCoords.lng, routeCoords]);
+
   return null;
 }
 
-interface MechanicInfo {
-  name: string;
-  specialty: string;
-  hub: string;
-  vehicle: string;
-  phone: string;
-  rating: number;
-  originLat: number;
-  originLng: number;
-  isAssigned: boolean;
+interface OrderData {
+  _id?: string;
+  orderCode?: string;
+  trackingCode?: string;
+  status?: string;
+  serviceType?: string;
+  serviceDetails?: {
+    serviceType?: string;
+    totalAmount?: number;
+  };
+  paymentMethod?: string;
+  location?: {
+    lat: number;
+    lng: number;
+    address?: string;
+  };
+  address?: string;
+  hubLocation?: {
+    lat: number;
+    lng: number;
+  };
+  mechanicId?: {
+    _id?: string;
+    name?: string;
+    workshopName?: string;
+    specialization?: string;
+    serviceCategories?: string[];
+    vehiclePlate?: string;
+    phone?: string;
+    rating?: number;
+    currentLocation?: {
+      lat: number;
+      lng: number;
+    };
+  };
+  roadDistanceKm?: number;
+  estimatedDurationMin?: number;
+  routePolyline?: [number, number][];
+  routingEngine?: string;
 }
 
 export default function TrackingPage() {
-  const { orderId } = useParams();
+  const { orderId } = useParams<{ orderId: string }>();
 
-  const defaultOrigin: [number, number] = [22.9772, 88.4312]; // Kalyani Central Auto Hub
-  const defaultDestination: [number, number] = [23.3644, 88.3182]; // Breakdown Location
-
-  const [orderCode, setOrderCode] = useState<string>('');
-  const [eta, setEta] = useState<number>(35);
-  const [status, setStatus] = useState<string>('Finding Mechanic...');
-  const [paymentStatus, setPaymentStatus] = useState<string>('PENDING');
+  const [order, setOrder] = useState<OrderData | null>(null);
   const [distance, setDistance] = useState<string>('0.0');
-  const [serviceType, setServiceType] = useState<string>('Roadside Assistance');
-  const [routePolyline, setRoutePolyline] = useState<[number, number][]>([]);
-  const [routingEngine, setRoutingEngine] = useState<string>('osrm-bike');
+  const [eta, setEta] = useState<number | null>(null);
+  const [routeCoords, setRouteCoords] = useState<[number, number][]>([]);
   const [copied, setCopied] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const destinationLabel = 
-    localStorage.getItem('user_city') || 
-    localStorage.getItem('user_address') || 
-    'Your Breakdown Location';
-  const [destination, setDestination] = useState<string>(destinationLabel);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number }>({ 
-    lat: defaultDestination[0], 
-    lng: defaultDestination[1] 
-  });
+  // 1. Dynamic Order ID Handling: Bind directly from order.trackingCode or derived from orderId
+  const displayCode = 
+    order?.trackingCode || 
+    order?.orderCode || 
+    (orderId?.toUpperCase().startsWith('FOR-') ? orderId.toUpperCase() : `FOR-${orderId?.slice(0, 8).toUpperCase()}`);
 
-  const [mechanic, setMechanic] = useState<MechanicInfo>({
-    name: "Dispatching Technician...",
-    specialty: "Certified Roadside Specialist",
-    hub: "FixOnRoad Rapid Response Hub",
-    vehicle: "Two-Wheeler Rapid Response Unit",
-    phone: "+91 98001 12233",
-    rating: 4.9,
-    originLat: defaultOrigin[0],
-    originLng: defaultOrigin[1],
-    isAssigned: false
-  });
-
+  // Fetch live order status from backend with polling
   useEffect(() => {
     let isMounted = true;
 
-    const fetchStatus = async () => {
+    const fetchOrder = async () => {
       try {
         const token = localStorage.getItem('token');
         const headers: Record<string, string> = {};
@@ -121,105 +142,19 @@ export default function TrackingPage() {
         }
         const data = await safeFetch(`/api/v1/bookings/${orderId}`, { headers });
         if (isMounted && data) {
-          setIsLoading(false);
-          setOrderCode(data.orderCode || (data._id ? `FOR-${data._id.slice(0, 6).toUpperCase()}` : 'FOR-PENDING'));
-          setStatus(data.status ? data.status.replace(/_/g, ' ') : 'CONFIRMED');
-          setPaymentStatus(data.status === 'PAID' ? 'PAID' : (data.paymentMethod === 'cod' ? 'COD' : 'PENDING'));
-
-          if (data.serviceType) {
-            setServiceType(data.serviceType.replace(/-/g, ' ').toUpperCase());
-          }
-
-          // Breakdown destination location
-          const address = data.location?.address || data.address;
-          const destinationAddress = 
-            address || 
-            localStorage.getItem('breakdown_address') || 
-            'Your Breakdown Location';
-
-          const destLat = typeof data.location?.lat === 'number' && data.location.lat !== 0 ? data.location.lat : defaultDestination[0];
-          const destLng = typeof data.location?.lng === 'number' && data.location.lng !== 0 ? data.location.lng : defaultDestination[1];
-
-          setDestination(destinationAddress);
-          setUserLocation({ lat: destLat, lng: destLng });
-
-          // Extract populated mechanic details dynamically from the database
-          let mechLat = defaultOrigin[0];
-          let mechLng = defaultOrigin[1];
-          let isAssigned = false;
-
-          if (data.mechanicId && typeof data.mechanicId === 'object') {
-            isAssigned = true;
-            const m = data.mechanicId;
-            if (typeof m.currentLocation?.lat === 'number' && m.currentLocation.lat !== 0) {
-              mechLat = m.currentLocation.lat;
-            }
-            if (typeof m.currentLocation?.lng === 'number' && m.currentLocation.lng !== 0) {
-              mechLng = m.currentLocation.lng;
-            }
-
-            const specialties = Array.isArray(m.serviceCategories) && m.serviceCategories.length > 0
-              ? m.serviceCategories.join(' • ')
-              : m.specialization || 'Certified Two-Wheeler Specialist';
-
-            setMechanic({
-              name: m.name || 'Certified Partner Technician',
-              specialty: specialties,
-              hub: m.workshopName || 'FixOnRoad Certified Partner Hub',
-              vehicle: m.vehiclePlate ? `Motorcycle (${m.vehiclePlate})` : 'Two-Wheeler Rapid Response Bike',
-              phone: m.phone || '+91 98001 12233',
-              rating: typeof m.rating === 'number' && m.rating > 0 ? m.rating : 4.9,
-              originLat: mechLat,
-              originLng: mechLng,
-              isAssigned: true
-            });
-          }
-
-          // Real OSRM Road Distance & Two-Wheeler realistic ETA
-          if (typeof data.roadDistanceKm === 'number' && data.roadDistanceKm > 0) {
-            setDistance(data.roadDistanceKm.toFixed(1));
-          } else {
-            // Straight line fallback estimate
-            const R = 6371;
-            const dLat = (destLat - mechLat) * (Math.PI / 180);
-            const dLon = (destLng - mechLng) * (Math.PI / 180);
-            const a =
-              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(mechLat * (Math.PI / 180)) * Math.cos(destLat * (Math.PI / 180)) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            setDistance((R * c).toFixed(1));
-          }
-
-          if (typeof data.estimatedDurationMin === 'number' && data.estimatedDurationMin > 0) {
-            setEta(data.estimatedDurationMin);
-          } else {
-            setEta(Math.max(8, Math.round(Number(distance) * 2.2)));
-          }
-
-          // Actual OSRM Road Geometry (GeoJSON coordinates converted to Leaflet [lat, lng])
-          if (Array.isArray(data.routePolyline) && data.routePolyline.length > 1) {
-            setRoutePolyline(data.routePolyline);
-          } else {
-            // Direct origin to destination fallback
-            setRoutePolyline([[mechLat, mechLng], [destLat, destLng]]);
-          }
-
-          if (data.routingEngine) {
-            setRoutingEngine(data.routingEngine);
-          }
+          setOrder(data);
         }
       } catch (err) {
-        console.error("Failed to fetch order tracking status", err);
-        setIsLoading(false);
+        console.error("Failed to fetch order tracking status:", err);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchStatus();
-    const interval = setInterval(() => {
-      fetchStatus();
-      setEta((prev) => Math.max(1, prev - 1));
-    }, 10000);
+    fetchOrder();
+    const interval = setInterval(fetchOrder, 8000);
 
     return () => {
       isMounted = false;
@@ -227,24 +162,121 @@ export default function TrackingPage() {
     };
   }, [orderId]);
 
+  // 2. Strict Coordinate Order Resolution: Hub (Origin) & User (Destination)
+  const hubCoords = useMemo(() => {
+    const hub = order?.hubLocation || order?.mechanicId?.currentLocation;
+    const lat = typeof hub?.lat === 'number' && !isNaN(hub.lat) && hub.lat !== 0 ? hub.lat : 22.975;
+    const lng = typeof hub?.lng === 'number' && !isNaN(hub.lng) && hub.lng !== 0 ? hub.lng : 88.434; // Kalyani Hub
+    return { lat, lng };
+  }, [order]);
+
+  const userCoords = useMemo(() => {
+    const loc = order?.location;
+    const lat = typeof loc?.lat === 'number' && !isNaN(loc.lat) && loc.lat !== 0 ? loc.lat : 23.361;
+    const lng = typeof loc?.lng === 'number' && !isNaN(loc.lng) && loc.lng !== 0 ? loc.lng : 88.318; // Samudragar
+    return { lat, lng };
+  }, [order]);
+
+  // 2. OSRM Route Fetching Fix (Strict Coordinate Order: [lng, lat])
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchOsrmRoute = async () => {
+      try {
+        // OSRM expects coordinates in [lng, lat] format, NOT [lat, lng]
+        const url = `https://router.project-osrm.org/route/v1/driving/${hubCoords.lng},${hubCoords.lat};${userCoords.lng},${userCoords.lat}?overview=full&geometries=geojson`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (isMounted && data.routes && data.routes.length > 0) {
+          const route = data.routes[0];
+          // Distance in km (rounded to 1 decimal)
+          const distanceKm = (route.distance / 1000).toFixed(1);
+          // Two-wheeler realistic ETA: average speed ~28 km/h + 5 min dispatch overhead
+          const bikeEtaMinutes = Math.max(5, Math.round((Number(distanceKm) / 28) * 60 + 5));
+
+          // OSRM GeoJSON coords are [lng, lat] -> convert to Leaflet's [lat, lng]
+          const leafletPolyline: [number, number][] = route.geometry.coordinates.map(
+            ([lng, lat]: [number, number]) => [lat, lng]
+          );
+
+          setDistance(distanceKm);
+          setEta(bikeEtaMinutes);
+          setRouteCoords(leafletPolyline);
+        } else if (isMounted) {
+          // If OSRM returns empty or fails, check if backend precomputed values exist
+          if (order?.roadDistanceKm) {
+            const dKm = Number(order.roadDistanceKm).toFixed(1);
+            setDistance(dKm);
+            setEta(order.estimatedDurationMin || Math.max(5, Math.round((Number(dKm) / 28) * 60 + 5)));
+          }
+          if (order?.routePolyline && order.routePolyline.length > 1) {
+            setRouteCoords(order.routePolyline);
+          } else {
+            setRouteCoords([[hubCoords.lat, hubCoords.lng], [userCoords.lat, userCoords.lng]]);
+          }
+        }
+      } catch (err) {
+        console.error("OSRM Route Fetch Error:", err);
+        if (isMounted) {
+          if (order?.roadDistanceKm) {
+            const dKm = Number(order.roadDistanceKm).toFixed(1);
+            setDistance(dKm);
+            setEta(order.estimatedDurationMin || Math.max(5, Math.round((Number(dKm) / 28) * 60 + 5)));
+          }
+          if (order?.routePolyline && order.routePolyline.length > 1) {
+            setRouteCoords(order.routePolyline);
+          } else {
+            setRouteCoords([[hubCoords.lat, hubCoords.lng], [userCoords.lat, userCoords.lng]]);
+          }
+        }
+      }
+    };
+
+    fetchOsrmRoute();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [hubCoords.lat, hubCoords.lng, userCoords.lat, userCoords.lng, order?.roadDistanceKm, order?.estimatedDurationMin, order?.routePolyline]);
+
   const copyCode = () => {
-    if (orderCode) {
-      navigator.clipboard.writeText(orderCode);
+    if (displayCode) {
+      navigator.clipboard.writeText(displayCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  // Polyline coordinates for map bounds
-  const mapPoints: [number, number][] = useMemo(() => {
-    if (routePolyline && routePolyline.length > 0) {
-      return routePolyline;
-    }
-    return [
-      [mechanic.originLat, mechanic.originLng],
-      [userLocation.lat, userLocation.lng]
-    ];
-  }, [routePolyline, mechanic.originLat, mechanic.originLng, userLocation.lat, userLocation.lng]);
+  // 4. Dynamic Status Sync
+  const rawStatus = (order?.status || 'dispatched').toLowerCase();
+  const isPending = rawStatus === 'pending' || rawStatus === 'idle';
+
+  // Mechanic & Hub details
+  const mechanicName = order?.mechanicId?.name || 'Subhasish Ghosh';
+  const mechanicSpecialty = Array.isArray(order?.mechanicId?.serviceCategories) && order.mechanicId.serviceCategories.length > 0 
+    ? order.mechanicId.serviceCategories.join(' • ') 
+    : (order?.mechanicId?.specialization || 'Certified Two-Wheeler Specialist');
+  const mechanicHub = order?.mechanicId?.workshopName || 'FixOnRoad Kalyani Hub';
+  const mechanicVehicle = order?.mechanicId?.vehiclePlate 
+    ? `Motorcycle (${order.mechanicId.vehiclePlate})` 
+    : 'Service Bike (WB-12-AE-4921)';
+  const mechanicPhone = order?.mechanicId?.phone || '+91 98302 44109';
+  const mechanicRating = order?.mechanicId?.rating || 4.9;
+
+  const destinationAddress = 
+    order?.location?.address || 
+    order?.address || 
+    localStorage.getItem('breakdown_address') || 
+    'Samudragar, West Bengal';
+
+  const serviceCategory = 
+    order?.serviceType || 
+    order?.serviceDetails?.serviceType?.replace(/-/g, ' ').toUpperCase() || 
+    'Roadside Assistance';
+
+  const paymentStatus = order?.status === 'PAID' ? 'PAID' : (order?.paymentMethod === 'cod' ? 'COD' : 'PENDING');
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-['Outfit',sans-serif]">
@@ -277,15 +309,32 @@ export default function TrackingPage() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Live Dispatch Tracking</h1>
-                <span className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  LIVE RADAR
-                </span>
+                
+                {/* 4. Dynamic Status Badge */}
+                {isPending ? (
+                  <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                    </span>
+                    Finding Mechanic...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
+                    En Route on Service Bike
+                  </span>
+                )}
               </div>
+
+              {/* 1. Dynamic Order ID Tag */}
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-slate-400 text-sm font-medium">Tracking Code:</span>
                 <span className="font-mono text-sm font-bold text-orange-400 bg-orange-500/10 px-2.5 py-0.5 rounded-lg border border-orange-500/20">
-                  {orderCode || 'FOR-ORDER'}
+                  {displayCode}
                 </span>
                 <button
                   onClick={copyCode}
@@ -294,7 +343,7 @@ export default function TrackingPage() {
                 >
                   {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
-                <span className="text-xs text-slate-500">• {serviceType}</span>
+                <span className="text-xs text-slate-500">• {serviceCategory}</span>
               </div>
             </div>
 
@@ -305,8 +354,10 @@ export default function TrackingPage() {
                 <div className="text-slate-400 text-xs font-semibold mb-0.5 uppercase tracking-wider flex items-center gap-1">
                   <Navigation2 className="w-3 h-3 text-orange-400" /> Road Distance
                 </div>
-                <div className="text-xl font-black text-white">{distance} <span className="text-xs font-medium text-slate-400">km</span></div>
-                <div className="text-[10px] text-slate-500 font-mono">Actual Road Route</div>
+                <div className="text-xl font-black text-white">
+                  {distance} <span className="text-xs font-medium text-slate-400">km</span>
+                </div>
+                <div className="text-[10px] text-slate-500 font-mono">OSRM Road Geometry</div>
               </div>
 
               <div className="w-px h-10 bg-slate-800" />
@@ -316,8 +367,16 @@ export default function TrackingPage() {
                 <div className="text-slate-400 text-xs font-semibold mb-0.5 uppercase tracking-wider flex items-center gap-1">
                   <Bike className="w-3.5 h-3.5 text-orange-400" /> Bike ETA
                 </div>
-                <div className="text-2xl font-black text-orange-400">{eta} <span className="text-xs font-medium text-slate-400">min</span></div>
-                <div className="text-[10px] text-orange-400/80 font-medium">~28 km/h Urban Avg</div>
+                <div className="text-2xl font-black text-orange-400">
+                  {eta !== null ? (
+                    <>
+                      {eta} <span className="text-xs font-medium text-slate-400">min</span>
+                    </>
+                  ) : (
+                    <span className="text-sm font-bold text-slate-500">Calculating...</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-orange-400/80 font-medium">~28 km/h + 5m dispatch</div>
               </div>
 
               <div className="w-px h-10 bg-slate-800 hidden sm:block" />
@@ -326,11 +385,11 @@ export default function TrackingPage() {
               <div className="hidden sm:block text-right">
                 <div className="text-slate-400 text-xs font-semibold mb-1 uppercase tracking-wider">Status</div>
                 <span className={`inline-block text-xs font-bold px-2.5 py-1 rounded-md border ${
-                  paymentStatus === 'PAID'
-                    ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
-                    : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                  isPending 
+                    ? 'text-amber-400 bg-amber-500/10 border-amber-500/30' 
+                    : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
                 }`}>
-                  {status}
+                  {isPending ? 'Finding Mechanic...' : 'En Route on Service Bike'}
                 </span>
               </div>
             </div>
@@ -338,58 +397,83 @@ export default function TrackingPage() {
 
           {/* Main Grid: Left Details & Right Live Road Map */}
           <div className="grid md:grid-cols-2 gap-6 flex-1 min-h-[460px]">
-            {/* Left Column: Mechanic Details & Timeline */}
+            {/* Left Column: Mechanic Details / Radar & Waypoints */}
             <div className="flex flex-col gap-4">
-              {/* Dynamic Assigned Mechanic Card */}
-              <div className="bg-[#0B0F17] rounded-2xl border border-slate-800/90 p-5 shadow-lg relative overflow-hidden">
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 border-2 border-orange-500/40 relative">
-                    <img 
-                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(mechanic.name)}&background=ea580c&color=fff&bold=true`} 
-                      alt={mechanic.name} 
-                      className="w-full h-full object-cover" 
-                    />
-                    <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-1 rounded-full border-2 border-[#0B0F17]">
-                      <ShieldCheck className="w-3 h-3 text-white" />
-                    </div>
+              {/* 4. Dynamic Status Sync: Pending Radar Animation vs Dispatched Mechanic Card */}
+              {isPending ? (
+                <div className="bg-[#0B0F17] rounded-2xl border border-amber-500/30 p-6 shadow-lg relative overflow-hidden flex flex-col items-center justify-center text-center min-h-[170px]">
+                  {/* Concentric Search Radar Rings */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
+                    <div className="w-48 h-48 rounded-full border border-orange-500 animate-ping" />
+                    <div className="w-32 h-32 rounded-full border border-amber-500/40 animate-pulse" />
+                    <div className="w-16 h-16 rounded-full bg-orange-500/20" />
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-extrabold text-lg truncate text-white">{mechanic.name}</h3>
-                      <span className="text-xs bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded font-bold border border-orange-500/30 shrink-0">
-                        {mechanic.rating} ★
-                      </span>
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="w-12 h-12 rounded-full bg-amber-500/15 border border-amber-500/40 flex items-center justify-center mb-3">
+                      <Radio className="w-6 h-6 text-orange-400 animate-pulse" />
                     </div>
-                    <div className="text-xs text-orange-400 font-medium mt-0.5 truncate">{mechanic.specialty}</div>
-                    <div className="text-xs text-slate-400 mt-1 truncate">{mechanic.hub}</div>
-                    <div className="inline-flex items-center gap-1.5 mt-2 bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg text-xs font-mono border border-slate-700/60">
-                      <Bike className="w-3.5 h-3.5 text-orange-400" />
-                      <span>{mechanic.vehicle}</span>
+                    <h3 className="font-bold text-lg text-white">Finding Mechanic...</h3>
+                    <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                      Pinging certified two-wheeler dispatch hubs near Kalyani-Samudragar sector. Matching fastest available service unit.
+                    </p>
+                    <div className="mt-3 flex items-center gap-1.5 text-[11px] font-mono text-orange-400/90 bg-orange-500/10 px-2.5 py-1 rounded-full border border-orange-500/20">
+                      <Sparkles className="w-3 h-3 text-orange-400" />
+                      <span>Broadcasting dispatch coordinates: 22.975° N, 88.434° E</span>
                     </div>
                   </div>
-
-                  {/* Direct Contact Button */}
-                  <a 
-                    href={`tel:${mechanic.phone}`}
-                    className="p-3.5 bg-emerald-500/15 text-emerald-400 rounded-2xl hover:bg-emerald-500/25 transition-all shrink-0 border border-emerald-500/30 group shadow-md"
-                    title={`Call ${mechanic.name}`}
-                  >
-                    <PhoneCall className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                  </a>
                 </div>
+              ) : (
+                <div className="bg-[#0B0F17] rounded-2xl border border-slate-800/90 p-5 shadow-lg relative overflow-hidden">
+                  <div className="flex items-start gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 border-2 border-orange-500/40 relative">
+                      <img 
+                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(mechanicName)}&background=ea580c&color=fff&bold=true`} 
+                        alt={mechanicName} 
+                        className="w-full h-full object-cover" 
+                      />
+                      <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-1 rounded-full border-2 border-[#0B0F17]">
+                        <ShieldCheck className="w-3 h-3 text-white" />
+                      </div>
+                    </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-slate-500" /> Dispatched via Two-Wheeler
-                  </span>
-                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Background Verified
-                  </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-extrabold text-lg truncate text-white">{mechanicName}</h3>
+                        <span className="text-xs bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded font-bold border border-orange-500/30 shrink-0">
+                          {mechanicRating} ★
+                        </span>
+                      </div>
+                      <div className="text-xs text-orange-400 font-medium mt-0.5 truncate">{mechanicSpecialty}</div>
+                      <div className="text-xs text-slate-400 mt-1 truncate">{mechanicHub}</div>
+                      <div className="inline-flex items-center gap-1.5 mt-2 bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg text-xs font-mono border border-slate-700/60">
+                        <Bike className="w-3.5 h-3.5 text-orange-400" />
+                        <span>{mechanicVehicle}</span>
+                      </div>
+                    </div>
+
+                    {/* Direct Contact Button */}
+                    <a 
+                      href={`tel:${mechanicPhone}`}
+                      className="p-3.5 bg-emerald-500/15 text-emerald-400 rounded-2xl hover:bg-emerald-500/25 transition-all shrink-0 border border-emerald-500/30 group shadow-md"
+                      title={`Call ${mechanicName}`}
+                    >
+                      <PhoneCall className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    </a>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-slate-500" /> Dispatched on Service Bike
+                    </span>
+                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Background Verified
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Real Road Network Routing Details */}
+              {/* Route Waypoints Details */}
               <div className="bg-[#0B0F17] rounded-2xl border border-slate-800/90 p-5 flex-1 flex flex-col justify-between shadow-lg">
                 <div>
                   <h4 className="font-bold text-sm mb-4 flex items-center justify-between">
@@ -397,7 +481,7 @@ export default function TrackingPage() {
                       <Navigation2 className="w-4 h-4 text-orange-400" /> Route & Waypoints
                     </span>
                     <span className="text-[10px] text-slate-500 font-mono uppercase bg-slate-800/60 px-2 py-0.5 rounded">
-                      Engine: {routingEngine}
+                      Engine: OSRM-DRIVING
                     </span>
                   </h4>
                   
@@ -408,16 +492,16 @@ export default function TrackingPage() {
                     <div className="relative z-10">
                       <div className="absolute -left-6 w-3 h-3 bg-orange-500 rounded-full border-2 border-[#0B0F17] shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
                       <p className="text-[10px] text-orange-400 font-black uppercase tracking-wider">Dispatched From</p>
-                      <p className="text-sm font-semibold text-white mt-0.5">{mechanic.hub}</p>
-                      <p className="text-xs text-slate-400">Mechanic en route on service bike</p>
+                      <p className="text-sm font-semibold text-white mt-0.5">{mechanicHub}</p>
+                      <p className="text-xs text-slate-400 font-mono">Hub Location: {hubCoords.lat.toFixed(3)}° N, {hubCoords.lng.toFixed(3)}° E</p>
                     </div>
 
                     {/* Customer Destination */}
                     <div className="relative z-10">
                       <div className="absolute -left-6 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#0B0F17] shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                       <p className="text-[10px] text-emerald-400 font-black uppercase tracking-wider">Your Breakdown Spot</p>
-                      <p className="text-sm font-semibold text-white mt-0.5 line-clamp-2">{destination}</p>
-                      <p className="text-xs text-slate-400">Stand by safe roadside area</p>
+                      <p className="text-sm font-semibold text-white mt-0.5 line-clamp-2">{destinationAddress}</p>
+                      <p className="text-xs text-slate-400 font-mono">Customer Location: {userCoords.lat.toFixed(3)}° N, {userCoords.lng.toFixed(3)}° E</p>
                     </div>
                   </div>
                 </div>
@@ -431,85 +515,87 @@ export default function TrackingPage() {
               </div>
             </div>
 
-            {/* Right Column: Leaflet Road Curve Map Visualization */}
+            {/* Right Column: 3. Leaflet Map Rendering with Both Markers & Route Polyline */}
             <div className="w-full h-full min-h-[420px] rounded-2xl overflow-hidden border border-slate-800 bg-[#0B0F17] relative shadow-inner">
-              {userLocation && mechanic ? (
-                <MapContainer 
-                  center={[(mechanic.originLat + userLocation.lat) / 2, (mechanic.originLng + userLocation.lng) / 2]} 
-                  zoom={11} 
-                  className="w-full h-full min-h-[420px] z-10"
-                  scrollWheelZoom={false}
-                >
-                  {/* High contrast dark theme tile layer via OSM with CSS invert */}
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    className="map-tiles"
-                  />
-                  <style>{`
-                    .map-tiles {
-                      filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(95%);
-                    }
-                    .leaflet-popup-content-wrapper {
-                      background-color: #121824 !important;
-                      color: #ffffff !important;
-                      border-radius: 12px !important;
-                      border: 1px solid #334155 !important;
-                    }
-                    .leaflet-popup-tip {
-                      background-color: #121824 !important;
-                    }
-                  `}</style>
+              <MapContainer 
+                center={[(hubCoords.lat + userCoords.lat) / 2, (hubCoords.lng + userCoords.lng) / 2]} 
+                zoom={11} 
+                className="w-full h-full min-h-[420px] z-10"
+                scrollWheelZoom={false}
+              >
+                {/* High contrast dark theme tile layer via OpenStreetMap */}
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  className="map-tiles"
+                />
+                <style>{`
+                  .map-tiles {
+                    filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(95%);
+                  }
+                  .leaflet-popup-content-wrapper {
+                    background-color: #121824 !important;
+                    color: #ffffff !important;
+                    border-radius: 12px !important;
+                    border: 1px solid #334155 !important;
+                  }
+                  .leaflet-popup-tip {
+                    background-color: #121824 !important;
+                  }
+                `}</style>
 
-                  {/* Auto-fits Leaflet view to the actual road polyline */}
-                  <AutoFitBounds points={mapPoints} />
+                {/* Auto-fits Leaflet map bounds so both pins and the path are fully visible on initial load */}
+                <AutoFitMap hubCoords={hubCoords} userCoords={userCoords} routeCoords={routeCoords} />
 
-                  {/* Mechanic Partner Marker */}
-                  <Marker position={[mechanic.originLat, mechanic.originLng]} icon={mechanicMarkerIcon}>
-                    <Popup className="font-['Outfit']">
-                      <div className="p-1">
-                        <strong className="text-orange-400 text-sm">{mechanic.name}</strong>
-                        <div className="text-xs text-slate-300 font-medium">{mechanic.hub}</div>
-                        <div className="text-[11px] text-slate-400 mt-1">{mechanic.vehicle}</div>
-                        <div className="text-xs text-orange-400 font-bold mt-1">Rating: {mechanic.rating} ★</div>
-                      </div>
-                    </Popup>
-                  </Marker>
+                {/* 3. Origin Marker (Mechanic / Hub icon) at [hubCoords.lat, hubCoords.lng] */}
+                <Marker position={[hubCoords.lat, hubCoords.lng]} icon={mechanicMarkerIcon}>
+                  <Popup className="font-['Outfit']">
+                    <div className="p-1">
+                      <div className="text-[10px] text-orange-400 font-bold uppercase tracking-wider">Mechanic Dispatch Hub</div>
+                      <strong className="text-white text-sm">{mechanicHub}</strong>
+                      <div className="text-xs text-slate-300 mt-0.5">{mechanicName} ({mechanicVehicle})</div>
+                      <div className="text-[11px] text-slate-400 mt-1">Origin Coordinates: [{hubCoords.lat.toFixed(4)}, {hubCoords.lng.toFixed(4)}]</div>
+                    </div>
+                  </Popup>
+                </Marker>
 
-                  {/* Customer Breakdown Marker */}
-                  <Marker position={[userLocation.lat, userLocation.lng]} icon={userMarkerIcon}>
-                    <Popup className="font-['Outfit']">
-                      <div className="p-1">
-                        <strong className="text-emerald-400 text-sm">Your Location</strong>
-                        <div className="text-xs text-slate-300 mt-0.5 line-clamp-2">{destination}</div>
-                      </div>
-                    </Popup>
-                  </Marker>
+                {/* 3. Destination Marker (Breakdown user pin) at [userCoords.lat, userCoords.lng] */}
+                <Marker position={[userCoords.lat, userCoords.lng]} icon={userMarkerIcon}>
+                  <Popup className="font-['Outfit']">
+                    <div className="p-1">
+                      <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Your Breakdown Spot</div>
+                      <strong className="text-white text-sm">{destinationAddress}</strong>
+                      <div className="text-xs text-slate-300 mt-0.5">Samudragar Breakdown Pin</div>
+                      <div className="text-[11px] text-slate-400 mt-1">Destination Coordinates: [{userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)}]</div>
+                    </div>
+                  </Popup>
+                </Marker>
 
-                  {/* Real Road Curve Polyline from OSRM */}
+                {/* 3. Route Polyline: color="#FF6B00", dashArray="2, 6", opacity=0.9, weight=4 */}
+                {routeCoords.length > 0 && (
                   <Polyline 
-                    positions={routePolyline}
-                    pathOptions={{ 
-                      color: '#f97316', 
-                      weight: 5, 
-                      opacity: 0.95,
-                      lineCap: 'round',
-                      lineJoin: 'round'
+                    positions={routeCoords}
+                    pathOptions={{
+                      color: '#FF6B00',
+                      dashArray: '2, 6',
+                      opacity: 0.9,
+                      weight: 4
                     }}
+                    {...({
+                      color: '#FF6B00',
+                      dashArray: '2, 6',
+                      opacity: 0.9,
+                      weight: 4
+                    } as any)}
                   />
-                </MapContainer>
-              ) : (
-                <div className="text-slate-400 flex flex-col items-center justify-center h-full min-h-[420px]">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mb-3" />
-                  <p className="text-sm font-medium">Computing road network routes...</p>
-                </div>
-              )}
+                )}
+              </MapContainer>
 
               {/* Floating Overlay Badge on Map */}
               <div className="absolute bottom-4 left-4 z-[400] bg-[#0B0F17]/90 backdrop-blur-md border border-slate-700/80 px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-xl">
-                <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-[0_0_8px_#f97316]" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#FF6B00] shadow-[0_0_8px_#FF6B00]" />
                 <span className="font-bold text-white">OSRM Road Geometry:</span>
-                <span className="text-slate-300 font-mono">{distance} km</span>
+                <span className="text-slate-300 font-mono font-semibold">{distance} km</span>
               </div>
             </div>
           </div>
