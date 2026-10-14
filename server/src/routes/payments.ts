@@ -4,6 +4,7 @@ import { requireAuth, optionalAuth } from '../middleware/auth';
 import { Order } from '../models/Order';
 import { User } from '../models/User';
 import { z } from 'zod';
+import { assignRandomAvailableMechanic } from '../utils/mechanicAssignment';
 
 const router = Router();
 
@@ -133,8 +134,18 @@ router.post('/create-order', requireAuth, async (req, res, next) => {
         effectiveUserId = guestUser._id;
       }
 
+      let assignedMechanicId = undefined;
+      const assignedMech = await assignRandomAvailableMechanic({
+        location: parsed.location ? { lat: parsed.location.lat, lng: parsed.location.lng } : null,
+        serviceType: parsed.serviceType
+      });
+      if (assignedMech) {
+        assignedMechanicId = assignedMech._id;
+      }
+
       order = await Order.create({
         userId: effectiveUserId,
+        mechanicId: assignedMechanicId,
         serviceDetails: {
           serviceType: parsed.serviceType,
           basePrice: basePrice,
@@ -144,7 +155,7 @@ router.post('/create-order', requireAuth, async (req, res, next) => {
         },
         location: parsed.location,
         paymentMethod: parsed.paymentMethod,
-        status: 'PENDING',
+        status: parsed.paymentMethod === 'cod' ? (assignedMechanicId ? 'CONFIRMED' : 'PENDING') : 'PENDING',
         expiresAt
       });
 
@@ -239,11 +250,24 @@ const handlePaymentVerification = async (req: any, res: any, next: any) => {
       order.razorpaySignature = razorpay_signature;
     }
 
+    // If order was pending and has no assigned mechanic, assign one on successful payment
+    let assignedMechanicId = order.mechanicId;
+    if (!assignedMechanicId) {
+      const assignedMech = await assignRandomAvailableMechanic({
+        location: order.location ? { lat: order.location.lat, lng: order.location.lng } : null,
+        serviceType: order.serviceDetails?.serviceType
+      });
+      if (assignedMech) {
+        assignedMechanicId = assignedMech._id;
+      }
+    }
+
     const updatedOrder = await Order.findOneAndUpdate(
       { _id: targetId },
       {
         $set: {
           status: 'PAID',
+          ...(assignedMechanicId && { mechanicId: assignedMechanicId }),
           ...(razorpay_order_id && { razorpayOrderId: razorpay_order_id }),
           ...(razorpay_payment_id && { razorpayPaymentId: razorpay_payment_id }),
           ...(razorpay_signature && { razorpaySignature: razorpay_signature })

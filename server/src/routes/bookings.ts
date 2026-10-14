@@ -4,6 +4,7 @@ import { Order } from '../models/Order';
 import { Mechanic } from '../models/Mechanic';
 import { requireAuth } from '../middleware/auth';
 import { calculateHaversineDistanceKm, isValidCoordinate, formatDistance } from '../utils/distance';
+import { assignRandomAvailableMechanic } from '../utils/mechanicAssignment';
 
 const router = Router();
 
@@ -213,14 +214,25 @@ router.get('/mechanic-earnings', requireAuth, async (req: any, res: any, next) =
 
 router.post('/', requireAuth, async (req: any, res: any, next) => {
   try {
-    const { mechanicId, serviceDetails, location } = req.body;
+    let { mechanicId, serviceDetails, location } = req.body;
     
+    // If mechanicId is not provided, auto-assign from available mechanics
+    if (!mechanicId) {
+      const assignedMech = await assignRandomAvailableMechanic({
+        location: location ? { lat: location.lat, lng: location.lng } : null,
+        serviceType: serviceDetails?.serviceType
+      });
+      if (assignedMech) {
+        mechanicId = assignedMech._id;
+      }
+    }
+
     const newOrder = await Order.create({
       userId: req.user._id,
       mechanicId,
       serviceDetails,
       location,
-      status: 'PENDING',
+      status: mechanicId ? 'CONFIRMED' : 'PENDING',
       expiresAt: new Date(Date.now() + 600000) // expires in 10 mins
     });
 
