@@ -4,11 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Wrench, Menu, X, Globe, MapPin, RefreshCw, Package, 
   ChevronDown, User as UserIcon, LogOut, PhoneCall, 
-  AlertTriangle, ShieldCheck, Check, Sparkles, Navigation
+  AlertTriangle, ShieldCheck, Check, Sparkles, Navigation,
+  ShoppingCart
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocationContext } from '../context/LocationContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useCart } from '../context/CartContext';
 import LanguageSelector from './LanguageSelector';
 import { safeFetch } from '../lib/api';
 
@@ -38,6 +40,7 @@ const HashLink = ({ to, children, className, onClick }: any) => {
 export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mechanic' }) {
   const { user, isAuthenticated, logout } = useAuth();
   const { t } = useLanguage();
+  const { itemCount } = useCart();
   const location = useLocation();
   const navigate = useNavigate();
   const { city, isLocating, fetchLocation, setCity, setAddress } = useLocationContext();
@@ -277,6 +280,31 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
             
             {/* Interactive Language Selector Dropdown */}
             <LanguageSelector variant="navbar" />
+
+            {/* Shopping Cart Icon Button with Dynamic Badge Indicator */}
+            {user?.role !== 'mechanic' && (
+              <Link
+                to="/cart"
+                className={`relative p-2 rounded-xl transition-all flex items-center justify-center group ${
+                  location.pathname === '/cart'
+                    ? 'bg-orange-500/20 border border-orange-500/50 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]'
+                    : 'bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-orange-500/40 text-slate-300 hover:text-white'
+                }`}
+                title={t('nav.cart', 'Cart')}
+                aria-label="View Roadside Assistance Cart"
+              >
+                <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover:scale-110" />
+                {itemCount > 0 && (
+                  <motion.span
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-[10px] flex items-center justify-center shadow-lg shadow-orange-500/40 border-2 border-[#0B0F17]"
+                  >
+                    {itemCount > 99 ? '99+' : itemCount}
+                  </motion.span>
+                )}
+              </Link>
+            )}
 
             {/* Logged Out State: Sign In + Emergency CTA */}
             {!isAuthenticated ? (
@@ -541,6 +569,28 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                     <Wrench className="w-4 h-4 text-orange-400 shrink-0" />
                     <span>{t('nav.services', 'Roadside Services')}</span>
                   </Link>
+
+                  {user?.role !== 'mechanic' && (
+                    <Link
+                      to="/cart"
+                      onClick={() => setMobileOpen(false)}
+                      className={`flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                        location.pathname === '/cart'
+                          ? 'bg-orange-500/15 border border-orange-500/30 text-orange-400 font-semibold'
+                          : 'text-zinc-300 hover:text-orange-400 active:text-orange-500 hover:bg-white/[0.05]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <ShoppingCart className="w-4 h-4 text-orange-400 shrink-0" />
+                        <span>{t('nav.cart', 'Roadside Cart')}</span>
+                      </div>
+                      {itemCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500 text-white shadow-sm">
+                          {itemCount}
+                        </span>
+                      )}
+                    </Link>
+                  )}
 
                   <HashLink
                     to="/#how-it-works"

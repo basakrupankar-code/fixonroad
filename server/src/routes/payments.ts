@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { assignRandomAvailableMechanic } from '../utils/mechanicAssignment';
 import { generateOrderCode } from '../utils/orderCode';
 import { getRoadRoute } from '../utils/routing';
+import { synchronizeLocation } from '../utils/locationSync';
 
 const router = Router();
 
@@ -136,23 +137,31 @@ router.post('/create-order', requireAuth, async (req, res, next) => {
         effectiveUserId = guestUser._id;
       }
 
+      // 1. Strictly synchronize customer coordinates and human-readable address
+      const syncLoc = synchronizeLocation(parsed.location);
+      const synchronizedLocation = {
+        address: syncLoc.address,
+        lat: syncLoc.lat,
+        lng: syncLoc.lng
+      };
+
       let assignedMechanicId = undefined;
       const assignedMech = await assignRandomAvailableMechanic({
-        location: parsed.location ? { lat: parsed.location.lat, lng: parsed.location.lng } : null,
+        location: { lat: syncLoc.lat, lng: syncLoc.lng },
         serviceType: parsed.serviceType
       });
       if (assignedMech) {
         assignedMechanicId = assignedMech._id;
       }
 
-      // Compute actual road network route & two-wheeler ETA via OSRM
+      // 2. Compute actual road network route & two-wheeler ETA via OSRM
       const originCoords = {
-        lat: assignedMech?.currentLocation?.lat || 22.9772,
-        lng: assignedMech?.currentLocation?.lng || 88.4312
+        lat: assignedMech?.currentLocation?.lat || 22.9750,
+        lng: assignedMech?.currentLocation?.lng || 88.4340
       };
       const destCoords = {
-        lat: parsed.location?.lat || 23.3644,
-        lng: parsed.location?.lng || 88.3182
+        lat: syncLoc.lat,
+        lng: syncLoc.lng
       };
       const routeData = await getRoadRoute(originCoords, destCoords);
 
@@ -169,7 +178,7 @@ router.post('/create-order', requireAuth, async (req, res, next) => {
           platformFee: platformFee + platformGst,
           totalAmount: totalAmount
         },
-        location: parsed.location,
+        location: synchronizedLocation,
         paymentMethod: parsed.paymentMethod,
         status: parsed.paymentMethod === 'cod' ? (assignedMechanicId ? 'CONFIRMED' : 'PENDING') : 'PENDING',
         roadDistanceKm: routeData.distanceKm,

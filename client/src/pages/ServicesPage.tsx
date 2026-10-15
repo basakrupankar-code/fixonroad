@@ -221,7 +221,7 @@ export default function ServicesPage() {
 
   const { user, isAuthenticated } = useAuth();
   const { addItem, removeItem, isInCart, clearCart } = useCart();
-  const { address } = useLocationContext();
+  const { address, coords } = useLocationContext();
 
   const handleProceed = (serviceId: string) => {
     if (!isAuthenticated) {
@@ -268,6 +268,11 @@ export default function ServicesPage() {
       const platformFee = 50;
       const totalAmount = basePrice + serviceGst + platformFee;
 
+      // Lock coordinates to match customer address source
+      const isSamudragar = (address || '').toLowerCase().includes('samudragar') || (address || '').toLowerCase().includes('kalna');
+      const lat = coords?.lat && coords.lat !== 0 ? coords.lat : (isSamudragar ? 23.3610 : 22.9772);
+      const lng = coords?.lng && coords.lng !== 0 ? coords.lng : (isSamudragar ? 88.3180 : 88.4312);
+
       const res = await safeFetch('/api/orders', {
         method: 'POST',
         headers,
@@ -283,8 +288,8 @@ export default function ServicesPage() {
           },
           location: {
             address: address || 'Kalyani, Nadia, West Bengal',
-            lat: 22.9772,
-            lng: 88.4312
+            lat,
+            lng
           },
           paymentMethod: 'cod',
           status: 'CONFIRMED'

@@ -50,7 +50,7 @@ export default function PaymentPage() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const { address, setAddress, isLocating, fetchLocation, geofence, isWithinServiceArea } = useLocationContext();
+  const { address, coords, setAddress, isLocating, fetchLocation, geofence, isWithinServiceArea } = useLocationContext();
 
   const basePrice = Number(service?.price || 150);
   const serviceGst = Math.round(basePrice * 0.18);
@@ -70,7 +70,7 @@ export default function PaymentPage() {
     setIsProcessing(true);
 
     try {
-      // 1. Create order on the backend (creates MongoDB order and Razorpay order in test mode)
+      // 1. Create order on the backend with synchronized location coordinates
       const token = localStorage.getItem('token');
       const authHeaders: Record<string, string> = {
         'Content-Type': 'application/json'
@@ -79,13 +79,17 @@ export default function PaymentPage() {
         authHeaders['Authorization'] = `Bearer ${token}`;
       }
 
+      const isSamudragar = (address || '').toLowerCase().includes('samudragar') || (address || '').toLowerCase().includes('kalna');
+      const lat = coords?.lat && coords.lat !== 0 ? coords.lat : (isSamudragar ? 23.3610 : 22.9772);
+      const lng = coords?.lng && coords.lng !== 0 ? coords.lng : (isSamudragar ? 88.3180 : 88.4312);
+
       const resData = await safeFetch('/api/v1/payments/create-order', {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
           serviceType: service?.id || "flat-tire",
           basePrice: basePrice,
-          location: { address: address, lat: 0, lng: 0 },
+          location: { address: address, lat, lng },
           paymentMethod: method
         })
       });

@@ -122,13 +122,37 @@ function LiveTracker() {
     return () => clearInterval(iv);
   }, [status]);
 
-  const orderId = localStorage.getItem('active_order_id') || '6ac8e7e0';
+  const handleCardClick = (e?: React.MouseEvent) => {
+    if (e) {
+      // Allow bubbling up unless handled
+    }
+    const savedOrderId = 
+      localStorage.getItem('active_order_id') || 
+      localStorage.getItem('active_order_code') || 
+      localStorage.getItem('last_order_id') ||
+      localStorage.getItem('last_order_code');
+
+    if (savedOrderId) {
+      navigate(`/track/${encodeURIComponent(savedOrderId)}`);
+    } else {
+      navigate('/orders');
+    }
+  };
 
   return (
     <div 
-      onClick={() => navigate(`/track/${orderId}`)}
-      className="glass-panel rounded-2xl p-6 relative overflow-hidden cursor-pointer transition-all duration-300 hover:border-orange-500/50 hover:shadow-[0_0_20px_rgba(249,115,22,0.15)] group" 
+      onClick={handleCardClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleCardClick();
+        }
+      }}
+      className="glass-panel rounded-2xl p-6 relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] hover:border-amber-500/40 active:scale-[0.99] hover:shadow-[0_0_20px_rgba(249,115,22,0.15)] group" 
       style={{ border: "1px solid rgba(249,115,22,0.2)" }}
+      aria-label="Track live dispatch or view active bookings"
     >
       <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-amber-500/5 pointer-events-none group-hover:from-orange-500/10 group-hover:to-amber-500/10 transition-colors" />
       <div className="relative z-10 space-y-5">
@@ -157,12 +181,28 @@ function LiveTracker() {
             <p className="font-semibold text-[15px] truncate">{status === "searching" ? t('radar.findingMechanic', 'Finding nearest mechanic…') : `${partner.name}`}</p>
             <p className="text-[13px] truncate" style={{ color: "var(--text-muted)" }}>{status === "searching" ? t('radar.scanning', 'Scanning 5 km radius in sector...') : `${partner.specialization} · ${partner.vehiclePlate}`}</p>
           </div>
-          <div className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide shrink-0 ${status === "searching" ? "bg-yellow-500/15 text-yellow-400" : status === "found" ? "bg-orange-500/15 text-orange-400" : "bg-emerald-500/15 text-emerald-400"}`}>
+          <div 
+            onClick={(e) => {
+              // Ensure inner interactive chip stops propagation to avoid conflicts
+              e.stopPropagation();
+              handleCardClick();
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide shrink-0 transition-transform hover:scale-105 ${status === "searching" ? "bg-yellow-500/15 text-yellow-400" : status === "found" ? "bg-orange-500/15 text-orange-400" : "bg-emerald-500/15 text-emerald-400"}`}
+          >
             {status === "searching" ? t('radar.searching', 'Searching') : status === "found" ? t('radar.matched', 'Matched') : t('radar.enRoute', 'En Route')}
           </div>
         </div>
         <div className="text-center pt-2">
-          <p className="text-xs text-orange-500/80 font-medium group-hover:text-orange-400 transition-colors">{t('radar.tapToViewRoute', 'Tap to view live route map →')}</p>
+          <p 
+            onClick={(e) => {
+              // Inner interactive link stops propagation and handles redirection cleanly
+              e.stopPropagation();
+              handleCardClick();
+            }}
+            className="text-xs text-orange-500/80 font-medium group-hover:text-orange-400 transition-colors inline-flex items-center gap-1 hover:underline cursor-pointer"
+          >
+            {t('radar.tapToViewRoute', 'Tap to view live route map →')}
+          </p>
         </div>
       </div>
     </div>
@@ -492,9 +532,13 @@ export default function App() {
                 />
                 <Route 
                   path="/cart" 
+                  element={<CartPage />} 
+                />
+                <Route 
+                  path="/checkout" 
                   element={
                     <ProtectedRoute allowedRoles={['customer']}>
-                      <CartPage />
+                      <Navigate to="/payment" replace />
                     </ProtectedRoute>
                   } 
                 />
@@ -515,7 +559,23 @@ export default function App() {
                   } 
                 />
                 <Route 
+                  path="/track-orders" 
+                  element={
+                    <ProtectedRoute allowedRoles={['customer']}>
+                      <OrdersPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
                   path="/track/:orderId" 
+                  element={
+                    <OrderTrackGuard>
+                      {({ order }) => <TrackingPage initialOrder={order} />}
+                    </OrderTrackGuard>
+                  } 
+                />
+                <Route 
+                  path="/track-orders/:orderId" 
                   element={
                     <OrderTrackGuard>
                       {({ order }) => <TrackingPage initialOrder={order} />}

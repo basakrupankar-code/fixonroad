@@ -11,33 +11,25 @@ export interface CartItem {
   noteKey?: string;
   icon?: string;
   quantity?: number;
+  unit?: string;
 }
 
-interface CartContextType {
+export interface CartContextType {
   items: CartItem[];
   addItem: (item: CartItem) => void;
+  addToCart: (item: CartItem) => void;
   removeItem: (id: string) => void;
+  removeFromCart: (id: string) => void;
+  updateQuantity: (id: string, delta: number) => void;
   clearCart: () => void;
   isInCart: (id: string) => boolean;
+  getCartTotal: () => number;
   itemCount: number;
   baseTotal: number;
   platformFee: number;
   gst: number;
   totalAmount: number;
 }
-
-const DEFAULT_INITIAL_CART: CartItem[] = [
-  {
-    id: 'flat-tire-bike',
-    name: 'Flat Tire / Puncture Repair',
-    nameKey: 'services.items.flatTire',
-    type: 'bike',
-    icon: 'droplets',
-    price: 150,
-    eta: '15-25 min',
-    quantity: 1,
-  }
-];
 
 const CART_STORAGE_KEY = 'fixonroad_cart';
 
@@ -48,12 +40,15 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const saved = localStorage.getItem(CART_STORAGE_KEY);
       if (saved !== null) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
       }
-      return DEFAULT_INITIAL_CART;
+      return [];
     } catch (e) {
       console.error('Failed to parse cart from localStorage', e);
-      return DEFAULT_INITIAL_CART;
+      return [];
     }
   });
 
@@ -67,16 +62,48 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const addItem = (item: CartItem) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
-      if (existing) {
+      const existingIndex = prev.findIndex((i) => i.id === item.id);
+      if (existingIndex > -1) {
+        const isMulti = item.id.includes('fuel') || item.unit === 'liters';
+        if (isMulti) {
+          const updated = [...prev];
+          const curr = updated[existingIndex];
+          updated[existingIndex] = {
+            ...curr,
+            quantity: Math.min((curr.quantity || 1) + (item.quantity || 1), 20),
+          };
+          return updated;
+        }
         return prev;
       }
-      return [...prev, { ...item, quantity: 1 }];
+      return [...prev, { ...item, quantity: item.quantity || 1 }];
     });
+  };
+
+  const addToCart = (item: CartItem) => {
+    addItem(item);
   };
 
   const removeItem = (id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const removeFromCart = (id: string) => {
+    removeItem(id);
+  };
+
+  const updateQuantity = (id: string, delta: number) => {
+    setItems((prev) =>
+      prev
+        .map((item) => {
+          if (item.id !== id) return item;
+          const currentQty = item.quantity || 1;
+          const nextQty = currentQty + delta;
+          if (nextQty <= 0) return null;
+          return { ...item, quantity: Math.min(20, nextQty) };
+        })
+        .filter((item): item is CartItem => item !== null)
+    );
   };
 
   const clearCart = () => {
@@ -93,14 +120,20 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const gst = Math.round(baseTotal * 0.18);
   const totalAmount = baseTotal + gst + platformFee;
 
+  const getCartTotal = () => totalAmount;
+
   return (
     <CartContext.Provider
       value={{
         items,
         addItem,
+        addToCart,
         removeItem,
+        removeFromCart,
+        updateQuantity,
         clearCart,
         isInCart,
+        getCartTotal,
         itemCount,
         baseTotal,
         platformFee,

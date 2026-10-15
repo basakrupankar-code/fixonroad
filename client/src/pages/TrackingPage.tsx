@@ -263,8 +263,23 @@ export default function TrackingPage({ initialOrder }: { initialOrder?: OrderDat
 
   const userCoords = useMemo(() => {
     const loc = order?.location;
-    const lat = typeof loc?.lat === 'number' && !isNaN(loc.lat) && loc.lat !== 0 ? loc.lat : 23.361;
-    const lng = typeof loc?.lng === 'number' && !isNaN(loc.lng) && loc.lng !== 0 ? loc.lng : 88.318; // Samudragar
+    const addr = (loc?.address || order?.address || '').toLowerCase();
+    
+    // Strict geographic synchronization: prevent Samudragar address with Kalyani coordinates
+    if (addr.includes('samudragar') || addr.includes('kalna')) {
+      const lat = typeof loc?.lat === 'number' && loc.lat >= 23.2 && loc.lat <= 23.5 ? loc.lat : 23.3610;
+      const lng = typeof loc?.lng === 'number' && loc.lng >= 88.2 && loc.lng <= 88.4 ? loc.lng : 88.3180;
+      return { lat, lng };
+    }
+
+    if (addr.includes('kalyani')) {
+      const lat = typeof loc?.lat === 'number' && loc.lat >= 22.9 && loc.lat <= 23.1 ? loc.lat : 22.9772;
+      const lng = typeof loc?.lng === 'number' && loc.lng >= 88.35 && loc.lng <= 88.5 ? loc.lng : 88.4312;
+      return { lat, lng };
+    }
+
+    const lat = typeof loc?.lat === 'number' && !isNaN(loc.lat) && loc.lat !== 0 ? loc.lat : 22.9772;
+    const lng = typeof loc?.lng === 'number' && !isNaN(loc.lng) && loc.lng !== 0 ? loc.lng : 88.4312;
     return { lat, lng };
   }, [order]);
 
@@ -360,7 +375,7 @@ export default function TrackingPage({ initialOrder }: { initialOrder?: OrderDat
     order?.location?.address || 
     order?.address || 
     localStorage.getItem('breakdown_address') || 
-    'Samudragar, West Bengal';
+    (userCoords.lat >= 23.2 ? 'Station Bazaar Road, Kalna - Samudragar Ferry Ghat Road, Samudragar, West Bengal' : 'Block B, Central Park Road, Kalyani, Nadia, West Bengal');
 
   const serviceCategory = 
     order?.serviceType || 

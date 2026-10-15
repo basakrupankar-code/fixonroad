@@ -276,6 +276,7 @@ export async function runSeed() {
       specialization: mech.specialization,
       serviceRadius: mech.serviceRadius,
       vehiclePlate: mech.vehiclePlate,
+      vehicleModel: mech.vehicleModel,
       upiId: mech.upiId,
       isAvailable: true,
       rating: mech.rating,
@@ -316,18 +317,69 @@ export async function runSeed() {
   console.log('📋 Seeding 25 Orders with 16-Character Tracking Codes (FOR-XXXXXXXXXXXXXXXX)...');
   const seededOrders: any[] = [];
 
+  // Dedicated demo configurations for the first 3 customer orders (Rupankar Basak) to verify uniqueness & coordinate sync
+  const DEMO_ORDERS = [
+    {
+      serviceType: 'flat-tyre',
+      serviceName: 'Flat Tyre / Puncture Repair',
+      basePrice: 299,
+      status: 'EN_ROUTE',
+      // Order 1: Genuine Kalyani breakdown spot near Central Park
+      location: {
+        address: 'Block B, Central Park Road, Kalyani, Nadia 741235',
+        lat: 22.9780,
+        lng: 88.4330
+      },
+      // Assign Kalyani Specialist 1: Subhasish Ghosh
+      mechanicIndex: 0 // Subhasish Ghosh (WB-12-AE-4921, Hero Splendor Plus)
+    },
+    {
+      serviceType: 'fuel-delivery',
+      serviceName: 'Emergency Fuel Delivery',
+      basePrice: 249,
+      status: 'CONFIRMED',
+      // Order 2: Genuine Samudragar breakdown spot (~45 km from Kalyani Hub)
+      location: {
+        address: 'Station Bazaar Road, Kalna - Samudragar Ferry Ghat Road, Samudragar, Purba Bardhaman 713519',
+        lat: 23.3610,
+        lng: 88.3180
+      },
+      // Assign distinct Fuel Delivery Specialist: Rajesh Karmakar (WB-18-B-6109, Hero Glamour 125)
+      mechanicIndex: 4 // Rajesh Karmakar (Carburetor & Fuel Injection Calibration)
+    },
+    {
+      serviceType: 'battery-jumpstart',
+      serviceName: 'Battery Jumpstart & Boost',
+      basePrice: 349,
+      status: 'MECHANIC_ASSIGNED',
+      // Order 3: Chakdaha highway breakdown spot (~14 km)
+      location: {
+        address: 'Lalpur Road, Near Chakdaha Station, Nadia 741222',
+        lat: 23.0820,
+        lng: 88.5220
+      },
+      // Assign distinct Battery Specialist: Debasish Mondal (WB-16-T-3401, Honda Shine 125)
+      mechanicIndex: 2 // Debasish Mondal
+    }
+  ];
+
   for (let i = 0; i < 25; i++) {
-    const user = userDocs[i % userDocs.length];
-    // Dynamically rotate mechanics across orders to guarantee distribution
-    const assignedMech = mechanicDocs[i % mechanicDocs.length];
-    const service = SERVICE_CATALOG[i % SERVICE_CATALOG.length];
-    const status = ORDER_STATUSES[i % ORDER_STATUSES.length];
+    const isDemo = i < DEMO_ORDERS.length;
+    const demoConfig = isDemo ? DEMO_ORDERS[i] : null;
+
+    const user = isDemo ? userDocs[0] : userDocs[i % userDocs.length];
+    const service = demoConfig ? { serviceType: demoConfig.serviceType, basePrice: demoConfig.basePrice } : SERVICE_CATALOG[i % SERVICE_CATALOG.length];
+    const status = (demoConfig ? demoConfig.status : ORDER_STATUSES[i % ORDER_STATUSES.length]) as any;
+
+    // Ensure distinct mechanics: rotate through all 10 mechanics based on service matching
+    const mechIndex = demoConfig ? demoConfig.mechanicIndex : ((i + 1) % mechanicDocs.length);
+    const assignedMech = mechanicDocs[mechIndex];
 
     const gst = Math.round(service.basePrice * 0.18 * 100) / 100;
     const platformFee = 25;
     const totalAmount = service.basePrice + gst + platformFee;
 
-    const userLoc = user.locationCoords || { lat: 23.3610, lng: 88.3180, address: 'Samudragar Breakdown Spot' };
+    const userLoc = demoConfig ? demoConfig.location : (user.locationCoords || { lat: 22.9780, lng: 88.4330, address: 'Kalyani Breakdown Spot' });
     const mechLoc = assignedMech.currentLocation || { lat: 22.9750, lng: 88.4340 };
 
     // Compute real road distance & two-wheeler realistic duration
@@ -366,7 +418,7 @@ export async function runSeed() {
     });
 
     seededOrders.push(order);
-    console.log(`   ✅ [Order #${i + 1}] ${trackingCode} | ₹${totalAmount} | ${status} | Cust: ${user.name} → Mech: ${status === 'PENDING' ? '(Searching...)' : assignedMech.name} (${routeData.distanceKm} km, ~${routeData.durationMinutes} min)`);
+    console.log(`   ✅ [Order #${i + 1}] ${trackingCode} | ${service.serviceType} | ₹${totalAmount} | ${status} | Cust: ${user.name} → Mech: ${assignedMech.name} [${assignedMech.vehiclePlate} • ${assignedMech.vehicleModel}] (${routeData.distanceKm} km, ~${routeData.durationMinutes} min)`);
   }
 
   console.log('\n═══════════════════════════════════════════════════════════════');

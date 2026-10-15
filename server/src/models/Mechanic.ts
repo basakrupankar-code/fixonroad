@@ -11,6 +11,7 @@ const mechanicSchema = new mongoose.Schema({
   specialization: { type: String },
   serviceRadius: { type: Number, default: 10 },
   vehiclePlate: { type: String },
+  vehicleModel: { type: String },
   upiId: { type: String },
   isAvailable: { type: Boolean, default: false },
   rating: { type: Number, default: 0 },

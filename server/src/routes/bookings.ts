@@ -7,6 +7,7 @@ import { calculateHaversineDistanceKm, isValidCoordinate, formatDistance } from 
 import { assignRandomAvailableMechanic } from '../utils/mechanicAssignment';
 import { generateOrderCode } from '../utils/orderCode';
 import { getRoadRoute } from '../utils/routing';
+import { synchronizeLocation } from '../utils/locationSync';
 
 const router = Router();
 
@@ -232,33 +233,41 @@ router.post('/', requireAuth, async (req: any, res: any, next) => {
       };
     }
 
+    // 1. Strictly lock and synchronize customer coordinates and human-readable address
+    const syncLoc = synchronizeLocation(location);
+    const synchronizedLocation = {
+      address: syncLoc.address,
+      lat: syncLoc.lat,
+      lng: syncLoc.lng
+    };
+
     let assignedMechanicDoc: any = null;
-    // 1. If mechanicId is provided, fetch the mechanic; otherwise auto-assign
+    // 2. If mechanicId is provided, fetch the mechanic; otherwise auto-assign based on availability, capability, and proximity
     if (mechanicId && mongoose.Types.ObjectId.isValid(mechanicId)) {
       assignedMechanicDoc = await Mechanic.findById(mechanicId);
     } else {
       assignedMechanicDoc = await assignRandomAvailableMechanic({
-        location: location ? { lat: location.lat, lng: location.lng } : null,
-        serviceType: serviceDetails?.serviceType
+        location: { lat: syncLoc.lat, lng: syncLoc.lng },
+        serviceType: serviceDetails?.serviceType || serviceType
       });
       if (assignedMechanicDoc) {
         mechanicId = assignedMechanicDoc._id;
       }
     }
 
-    // 2. Compute real road network route & two-wheeler ETA via OSRM
+    // 3. Compute real road network route & two-wheeler ETA via OSRM from mechanic's hub to customer coordinates
     const originCoords = {
-      lat: assignedMechanicDoc?.currentLocation?.lat || 22.9772,
-      lng: assignedMechanicDoc?.currentLocation?.lng || 88.4312
+      lat: assignedMechanicDoc?.currentLocation?.lat || 22.9750,
+      lng: assignedMechanicDoc?.currentLocation?.lng || 88.4340
     };
     const destCoords = {
-      lat: location?.lat || 23.3644,
-      lng: location?.lng || 88.3182
+      lat: syncLoc.lat,
+      lng: syncLoc.lng
     };
 
     const routeData = await getRoadRoute(originCoords, destCoords);
 
-    // 3. Create unique order with 16-character cryptographic tracking code
+    // 4. Create unique order with 16-character cryptographic tracking code
     const orderCode = generateOrderCode();
     const newOrder = await Order.create({
       userId: req.user._id,
@@ -266,7 +275,7 @@ router.post('/', requireAuth, async (req: any, res: any, next) => {
       trackingCode: orderCode,
       mechanicId,
       serviceDetails,
-      location,
+      location: synchronizedLocation,
       paymentMethod: paymentMethod || 'cod',
       status: status || (mechanicId ? 'CONFIRMED' : 'PENDING'),
       roadDistanceKm: routeData.distanceKm,
@@ -303,13 +312,15 @@ router.get('/', requireAuth, async (req: any, res: any, next) => {
       query = { $or: [{ userId: userObjId }, { userId: req.user.userId }, { userId: req.user._id }] };
     }
     
-    // Sanitize query to prevent NoSQL operator injection
+    // Sanitize query to prevent NoSQL operator injection; exclude inactive/cancelled by default
     if (typeof status === 'string' && VALID_ORDER_STATUSES.includes(status as any)) {
       query.status = status;
+    } else if (!status) {
+      query.status = { $nin: ['CANCELLED', 'FAILED', 'EXPIRED'] };
     }
     
     const orders = await Order.find(query)
-      .populate('mechanicId', 'name workshopName specialization serviceCategories vehiclePlate phone rating currentLocation')
+      .populate('mechanicId', 'name workshopName specialization serviceCategories vehiclePlate vehicleModel phone rating currentLocation')
       .sort({ createdAt: -1 });
 
     const normalizedOrders = orders.map((o: any) => {
@@ -326,10 +337,11 @@ router.get('/', requireAuth, async (req: any, res: any, next) => {
         o.serviceFee || 
         150;
 
-      const location = o.location || {
-        address: o.address || 'Kalyani, West Bengal',
-        lat: 22.9772,
-        lng: 88.4312
+      const syncLoc = synchronizeLocation(o.location || { address: o.address });
+      const location = {
+        address: o.location?.address || syncLoc.address,
+        lat: typeof o.location?.lat === 'number' && o.location.lat !== 0 ? o.location.lat : syncLoc.lat,
+        lng: typeof o.location?.lng === 'number' && o.location.lng !== 0 ? o.location.lng : syncLoc.lng
       };
 
       return {
@@ -417,13 +429,24 @@ router.get('/track/:id', requireAuth, async (req: any, res: any, next) => {
       });
     }
 
-    // 3. Dynamically backfill road network geometry & realistic ETA if missing
+    // 3. Dynamically synchronize customer location & backfill road network geometry & realistic ETA if missing
+    const syncLoc = synchronizeLocation(booking.location);
+    if (!booking.location?.lat || booking.location.lat === 0 || 
+        (syncLoc.address.toLowerCase().includes('samudragar') && booking.location.lat < 23)) {
+      booking.location = {
+        address: syncLoc.address,
+        lat: syncLoc.lat,
+        lng: syncLoc.lng
+      };
+      await booking.save();
+    }
+
     if (!booking.routePolyline || booking.routePolyline.length <= 2 || !booking.roadDistanceKm) {
-      const mechLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.975, lng: 88.434 };
-      const destLocation = booking.location || { lat: 23.361, lng: 88.318 };
+      const mechLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.9750, lng: 88.4340 };
+      const destLocation = { lat: syncLoc.lat, lng: syncLoc.lng };
       const routeData = await getRoadRoute(
-        { lat: mechLocation.lat || 22.975, lng: mechLocation.lng || 88.434 },
-        { lat: destLocation.lat || 23.361, lng: destLocation.lng || 88.318 }
+        { lat: mechLocation.lat || 22.9750, lng: mechLocation.lng || 88.4340 },
+        { lat: destLocation.lat, lng: destLocation.lng }
       );
       booking.roadDistanceKm = routeData.distanceKm;
       booking.estimatedDurationMin = routeData.durationMinutes;
@@ -479,13 +502,24 @@ router.get('/:id', requireAuth, async (req: any, res: any, next) => {
       });
     }
 
-    // If routePolyline is missing or empty or a 2-point straight line, dynamically compute & backfill it
+    // Dynamically synchronize customer location & backfill road network geometry & realistic ETA if missing
+    const syncLoc = synchronizeLocation(booking.location);
+    if (!booking.location?.lat || booking.location.lat === 0 || 
+        (syncLoc.address.toLowerCase().includes('samudragar') && booking.location.lat < 23)) {
+      booking.location = {
+        address: syncLoc.address,
+        lat: syncLoc.lat,
+        lng: syncLoc.lng
+      };
+      await booking.save();
+    }
+
     if (!booking.routePolyline || booking.routePolyline.length <= 2 || !booking.roadDistanceKm) {
-      const mechLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.975, lng: 88.434 };
-      const destLocation = booking.location || { lat: 23.361, lng: 88.318 };
+      const mechLocation = (booking.mechanicId as any)?.currentLocation || { lat: 22.9750, lng: 88.4340 };
+      const destLocation = { lat: syncLoc.lat, lng: syncLoc.lng };
       const routeData = await getRoadRoute(
-        { lat: mechLocation.lat || 22.975, lng: mechLocation.lng || 88.434 },
-        { lat: destLocation.lat || 23.361, lng: destLocation.lng || 88.318 }
+        { lat: mechLocation.lat || 22.9750, lng: mechLocation.lng || 88.4340 },
+        { lat: destLocation.lat, lng: destLocation.lng }
       );
       booking.roadDistanceKm = routeData.distanceKm;
       booking.estimatedDurationMin = routeData.durationMinutes;

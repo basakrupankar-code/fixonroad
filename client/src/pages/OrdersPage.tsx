@@ -20,6 +20,7 @@ interface MechanicDetails {
   specialization?: string;
   serviceCategories?: string[];
   vehiclePlate?: string;
+  vehicleModel?: string;
   phone?: string;
   rating?: number;
 }
@@ -50,7 +51,7 @@ interface OrderItem {
   createdAt?: string;
 }
 
-type TabType = 'all' | 'active' | 'completed' | 'cancelled';
+type TabType = 'all' | 'active' | 'completed';
 
 export default function OrdersPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -174,11 +175,13 @@ export default function OrdersPage() {
     return ['CANCELLED', 'EXPIRED', 'FAILED'].includes(s);
   };
 
-  const filteredOrders = orders.filter((order) => {
+  // Exclude cancelled / inactive orders so they are removed from the /orders list
+  const validOrders = orders.filter((order) => !isCancelledOrder(order.status));
+
+  const filteredOrders = validOrders.filter((order) => {
     // Tab filter
     if (activeTab === 'active' && !isActiveOrder(order.status)) return false;
     if (activeTab === 'completed' && !isCompletedOrder(order.status)) return false;
-    if (activeTab === 'cancelled' && !isCancelledOrder(order.status)) return false;
 
     // Search query filter
     if (searchQuery.trim()) {
@@ -193,9 +196,8 @@ export default function OrdersPage() {
     return true;
   });
 
-  const activeCount = orders.filter(o => isActiveOrder(o.status)).length;
-  const completedCount = orders.filter(o => isCompletedOrder(o.status)).length;
-  const cancelledCount = orders.filter(o => isCancelledOrder(o.status)).length;
+  const activeCount = validOrders.filter(o => isActiveOrder(o.status)).length;
+  const completedCount = validOrders.filter(o => isCompletedOrder(o.status)).length;
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-white flex flex-col font-['Outfit',sans-serif]">
@@ -308,7 +310,7 @@ export default function OrdersPage() {
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                 }`}
               >
-                All Orders ({orders.length})
+                All Orders ({validOrders.length})
               </button>
               <button
                 onClick={() => setActiveTab('active')}
@@ -334,16 +336,6 @@ export default function OrdersPage() {
                 }`}
               >
                 Completed ({completedCount})
-              </button>
-              <button
-                onClick={() => setActiveTab('cancelled')}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
-                  activeTab === 'cancelled'
-                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/25'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                Cancelled ({cancelledCount})
               </button>
             </div>
 
