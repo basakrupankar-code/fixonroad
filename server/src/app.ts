@@ -61,18 +61,33 @@ app.use(helmet({
   noSniff: true,
 }));
 
-const rawOrigins = process.env.CLIENT_ORIGIN 
-  ? process.env.CLIENT_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
-  : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const defaultDevOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5005',
+];
 
-// Never allow wildcard with credentials in production
-const allowedOrigins = rawOrigins.filter(o => o !== '*');
+const envOrigins = process.env.CLIENT_ORIGIN 
+  ? process.env.CLIENT_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
+  : [];
+
+const allowedOrigins = Array.from(new Set([...envOrigins, ...defaultDevOrigins])).filter(o => o !== '*');
 
 app.use(cors({ 
   origin: (origin, callback) => {
     // Allow non-browser requests (e.g. mobile apps, server-to-server, curl)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
+    
+    // Check exact match or localhost or vercel.app domains
+    const isAllowed = 
+      allowedOrigins.includes(origin) ||
+      /^https:\/\/.*\.vercel\.app$/.test(origin) ||
+      /^http:\/\/localhost:\d+$/.test(origin) ||
+      /^http:\/\/127\.0\.0\.1:\d+$/.test(origin);
+
+    if (isAllowed) {
       callback(null, true);
     } else {
       callback(new Error('Blocked by CORS policy'));
