@@ -5,7 +5,7 @@ import { Order } from '../models/Order';
 import { verifyCartAuth, requireCustomerCartRole } from '../middleware/auth';
 import { generateOrderCode } from '../utils/orderCode';
 import { assignRandomAvailableMechanic } from '../utils/mechanicAssignment';
-import { getRoadRoute } from '../utils/routing';
+import { getRoadRoute, RouteResult } from '../utils/routing';
 
 const router = Router();
 
@@ -184,11 +184,16 @@ router.post('/checkout', async (req: Request, res: Response) => {
       address: bodyLocation?.address || cart.breakdownLocation?.address || 'Current Breakdown Location'
     };
 
+    const serviceType = cart.items.map(i => i.name).join(' + ');
+
     // Auto-assign nearest available mechanic
     let mechanicId = null;
-    let assignedMechanicDoc = null;
+    let assignedMechanicDoc: any = null;
     try {
-      assignedMechanicDoc = await assignRandomAvailableMechanic(location);
+      assignedMechanicDoc = await assignRandomAvailableMechanic({
+        location: { lat: location.lat, lng: location.lng },
+        serviceType
+      });
       if (assignedMechanicDoc) {
         mechanicId = assignedMechanicDoc._id;
       }
@@ -205,7 +210,12 @@ router.post('/checkout', async (req: Request, res: Response) => {
       lng: location.lng
     };
 
-    let routeData = { distanceKm: 2.5, durationMinutes: 12, coordinates: [], source: 'osrm' };
+    let routeData: RouteResult = {
+      distanceKm: 2.5,
+      durationMinutes: 12,
+      coordinates: [[originCoords.lat, originCoords.lng], [destCoords.lat, destCoords.lng]],
+      source: 'fallback'
+    };
     try {
       routeData = await getRoadRoute(originCoords, destCoords);
     } catch (err) {
@@ -213,7 +223,7 @@ router.post('/checkout', async (req: Request, res: Response) => {
     }
 
     const orderCode = generateOrderCode();
-    const serviceType = cart.items.map(i => i.name).join(' + ');
+
 
     const newOrder = await Order.create({
       userId,
