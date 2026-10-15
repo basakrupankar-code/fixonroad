@@ -6,6 +6,7 @@ import { bookingsRouter } from './bookings';
 import { paymentsRouter } from './payments';
 import { reviewsRouter } from './reviews';
 import { meRouter } from './me';
+import { cartRouter } from './cart';
 
 export const setupRoutes = (app: Application) => {
   app.use('/api/v1/auth', authRouter);
@@ -17,4 +18,7 @@ export const setupRoutes = (app: Application) => {
   app.use('/api/v1/payments', paymentsRouter);
   app.use('/api/v1/reviews', reviewsRouter);
   app.use('/api/v1/me', meRouter);
+  app.use('/api/v1/cart', cartRouter);
+  app.use('/api/cart', cartRouter);
 };
+

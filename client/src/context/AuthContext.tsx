@@ -63,6 +63,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) {
       console.error(e);
     }
+    // Prevent dangling roadside breakdown states across sign-outs
+    localStorage.removeItem('token');
+    localStorage.removeItem('fixonroad_cart');
+    localStorage.removeItem('user_address');
+    localStorage.removeItem('user_city');
+    localStorage.removeItem('user_coords');
+    localStorage.removeItem('user_geofence');
+    localStorage.removeItem('breakdown_address');
+    localStorage.removeItem('active_order_id');
+    localStorage.removeItem('active_order_code');
+    localStorage.removeItem('last_order_id');
+    localStorage.removeItem('last_order_code');
+    sessionStorage.removeItem('fixonroad_pending_cart_intent');
     setUser(null);
   };
 

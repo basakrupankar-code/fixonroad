@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { useAuth } from './AuthContext';
 
 export interface CartItem {
   id: string;
@@ -24,6 +25,7 @@ export interface CartContextType {
   clearCart: () => void;
   isInCart: (id: string) => boolean;
   getCartTotal: () => number;
+  hydratePendingIntent: () => boolean;
   itemCount: number;
   baseTotal: number;
   platformFee: number;
@@ -32,12 +34,16 @@ export interface CartContextType {
 }
 
 const CART_STORAGE_KEY = 'fixonroad_cart';
+export const PENDING_CART_INTENT_KEY = 'fixonroad_pending_cart_intent';
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user, isAuthenticated } = useAuth();
+
   const [items, setItems] = useState<CartItem[]>(() => {
     try {
+      // If user is not authenticated or is a mechanic, cart is not loaded
       const saved = localStorage.getItem(CART_STORAGE_KEY);
       if (saved !== null) {
         const parsed = JSON.parse(saved);
@@ -52,15 +58,31 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   });
 
+  // When auth changes: if unauthenticated or logged in as mechanic, wipe cart state
+  useEffect(() => {
+    if (!isAuthenticated || user?.role === 'mechanic') {
+      setItems([]);
+      localStorage.removeItem(CART_STORAGE_KEY);
+      if (user?.role === 'mechanic') {
+        sessionStorage.removeItem(PENDING_CART_INTENT_KEY);
+      }
+    }
+  }, [isAuthenticated, user?.role]);
+
+  // Persist items to localStorage only if authenticated as a customer
   useEffect(() => {
     try {
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+      if (isAuthenticated && user?.role !== 'mechanic') {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+      } else {
+        localStorage.removeItem(CART_STORAGE_KEY);
+      }
     } catch (e) {
       console.error('Failed to save cart to localStorage', e);
     }
-  }, [items]);
+  }, [items, isAuthenticated, user?.role]);
 
-  const addItem = (item: CartItem) => {
+  const addItem = useCallback((item: CartItem) => {
     setItems((prev) => {
       const existingIndex = prev.findIndex((i) => i.id === item.id);
       if (existingIndex > -1) {
@@ -78,21 +100,21 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       return [...prev, { ...item, quantity: item.quantity || 1 }];
     });
-  };
+  }, []);
 
-  const addToCart = (item: CartItem) => {
+  const addToCart = useCallback((item: CartItem) => {
     addItem(item);
-  };
+  }, [addItem]);
 
-  const removeItem = (id: string) => {
+  const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
-  };
+  }, []);
 
-  const removeFromCart = (id: string) => {
+  const removeFromCart = useCallback((id: string) => {
     removeItem(id);
-  };
+  }, [removeItem]);
 
-  const updateQuantity = (id: string, delta: number) => {
+  const updateQuantity = useCallback((id: string, delta: number) => {
     setItems((prev) =>
       prev
         .map((item) => {
@@ -104,15 +126,53 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         })
         .filter((item): item is CartItem => item !== null)
     );
-  };
+  }, []);
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setItems([]);
-  };
+    localStorage.removeItem(CART_STORAGE_KEY);
+  }, []);
 
-  const isInCart = (id: string) => {
+  const isInCart = useCallback((id: string) => {
     return items.some((item) => item.id === id);
-  };
+  }, [items]);
+
+  // Hydrate pending roadside assistance intent from sessionStorage
+  const hydratePendingIntent = useCallback((): boolean => {
+    try {
+      const raw = sessionStorage.getItem(PENDING_CART_INTENT_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.service) {
+        addItem({
+          ...parsed.service,
+          quantity: parsed.service.quantity || 1,
+        });
+
+        if (parsed.address) {
+          localStorage.setItem('user_address', parsed.address);
+          localStorage.setItem('breakdown_address', parsed.address);
+        }
+        if (parsed.coords) {
+          localStorage.setItem('user_coords', JSON.stringify(parsed.coords));
+        }
+
+        sessionStorage.removeItem(PENDING_CART_INTENT_KEY);
+        return true;
+      }
+    } catch (e) {
+      console.error('Failed to hydrate pending cart intent:', e);
+      sessionStorage.removeItem(PENDING_CART_INTENT_KEY);
+    }
+    return false;
+  }, [addItem]);
+
+  // Automatically attempt hydration if user logs in as customer
+  useEffect(() => {
+    if (isAuthenticated && user?.role !== 'mechanic') {
+      hydratePendingIntent();
+    }
+  }, [isAuthenticated, user?.role, hydratePendingIntent]);
 
   const itemCount = items.reduce((count, item) => count + (item.quantity || 1), 0);
   const baseTotal = items.reduce((sum, item) => sum + item.price * (item.quantity || 1), 0);
@@ -134,6 +194,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         clearCart,
         isInCart,
         getCartTotal,
+        hydratePendingIntent,
         itemCount,
         baseTotal,
         platformFee,

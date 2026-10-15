@@ -282,9 +282,9 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
             <LanguageSelector variant="navbar" />
 
             {/* Shopping Cart Icon Button with Dynamic Badge Indicator */}
-            {user?.role !== 'mechanic' && (
+            {!isMechanic && user?.role !== 'mechanic' && (
               <Link
-                to="/cart"
+                to={isAuthenticated ? "/cart" : "/signin?redirect=/cart"}
                 className={`relative p-2 rounded-xl transition-all flex items-center justify-center group ${
                   location.pathname === '/cart'
                     ? 'bg-orange-500/20 border border-orange-500/50 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]'
@@ -294,7 +294,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                 aria-label="View Roadside Assistance Cart"
               >
                 <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover:scale-110" />
-                {itemCount > 0 && (
+                {isAuthenticated && itemCount > 0 && (
                   <motion.span
                     initial={{ scale: 0.5, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
@@ -305,6 +305,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                 )}
               </Link>
             )}
+
 
             {/* Logged Out State: Sign In + Emergency CTA */}
             {!isAuthenticated ? (
@@ -570,9 +571,9 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                     <span>{t('nav.services', 'Roadside Services')}</span>
                   </Link>
 
-                  {user?.role !== 'mechanic' && (
+                  {!isMechanic && user?.role !== 'mechanic' && (
                     <Link
-                      to="/cart"
+                      to={isAuthenticated ? "/cart" : "/signin?redirect=/cart"}
                       onClick={() => setMobileOpen(false)}
                       className={`flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${
                         location.pathname === '/cart'
@@ -584,7 +585,7 @@ export default function Navbar({ variant = 'rider' }: { variant?: 'rider' | 'mec
                         <ShoppingCart className="w-4 h-4 text-orange-400 shrink-0" />
                         <span>{t('nav.cart', 'Roadside Cart')}</span>
                       </div>
-                      {itemCount > 0 && (
+                      {isAuthenticated && itemCount > 0 && (
                         <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500 text-white shadow-sm">
                           {itemCount}
                         </span>

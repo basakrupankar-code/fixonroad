@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -28,7 +28,7 @@ const iconMap: Record<string, React.ReactNode> = {
 export default function CartPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const { 
     items, 
     removeItem, 
@@ -52,6 +52,19 @@ export default function CartPage() {
   const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [customAddress, setCustomAddress] = useState(address || '');
 
+  // Defensive route protection directly within CartPage
+  useEffect(() => {
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        toast.error('Please sign in to view your roadside assistance cart.', { id: 'cart-auth-required' });
+        navigate('/signin?redirect=/cart', { replace: true });
+      } else if (user?.role === 'mechanic') {
+        toast.error('Cart and roadside dispatch are only accessible to customer accounts.', { id: 'mechanic-cart-denied' });
+        navigate('/mechanic/dashboard', { replace: true });
+      }
+    }
+  }, [isLoading, isAuthenticated, user?.role, navigate]);
+
   const handleRemove = (item: CartItem) => {
     removeItem(item.id);
     toast.success(t('cart.removedToast', `Removed ${item.name} from cart`));
@@ -74,7 +87,12 @@ export default function CartPage() {
     if (items.length === 0) return;
     if (!isAuthenticated) {
       toast.error(t('cart.authRequired', 'Please sign in to confirm breakdown dispatch'));
-      navigate('/auth?redirect=/cart');
+      navigate('/signin?redirect=/cart');
+      return;
+    }
+    if (user?.role === 'mechanic') {
+      toast.error('Cart and roadside dispatch are only accessible to customer accounts.', { id: 'mechanic-cart-denied' });
+      navigate('/mechanic/dashboard');
       return;
     }
     navigate('/payment', { 
@@ -85,6 +103,7 @@ export default function CartPage() {
       } 
     });
   };
+
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-white flex flex-col relative overflow-hidden">

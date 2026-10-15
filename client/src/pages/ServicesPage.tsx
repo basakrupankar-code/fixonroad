@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
-import { useCart } from '../context/CartContext';
+import { useCart, PENDING_CART_INTENT_KEY } from '../context/CartContext';
 import { useLocationContext } from '../context/LocationContext';
 import { safeFetch } from '../lib/api';
 import OrderConfirmationModal, { OrderConfirmationData } from '../components/OrderConfirmationModal';
@@ -223,33 +223,59 @@ export default function ServicesPage() {
   const { addItem, removeItem, isInCart, clearCart } = useCart();
   const { address, coords } = useLocationContext();
 
+  const cacheIntentAndRedirect = (svc: Service) => {
+    const intent = {
+      service: {
+        id: svc.id,
+        name: svc.name,
+        nameKey: svc.nameKey,
+        type: svc.type,
+        icon: svc.icon,
+        price: svc.price,
+        eta: svc.eta,
+        quantity: 1,
+      },
+      coords: coords || null,
+      address: address || null,
+      timestamp: Date.now()
+    };
+    try {
+      sessionStorage.setItem(PENDING_CART_INTENT_KEY, JSON.stringify(intent));
+    } catch (e) {
+      console.error('Failed to store cart intent in sessionStorage', e);
+    }
+    toast.error('Please sign in to add roadside dispatch services to your cart.', { id: 'auth-required-cart' });
+    navigate('/signin?redirect=/cart');
+  };
+
   const handleProceed = (serviceId: string) => {
+    const svc = SERVICES.find(s => s.id === serviceId);
+    if (!svc) return;
+
     if (!isAuthenticated) {
-      navigate(`/auth?redirect=/services&serviceId=${serviceId}`);
+      cacheIntentAndRedirect(svc);
       return;
     }
-    const svc = SERVICES.find(s => s.id === serviceId);
-    if (svc) {
-      setSelectedService(svc);
-      if (!isInCart(svc.id)) {
-        addItem({
-          id: svc.id,
-          name: svc.name,
-          nameKey: svc.nameKey,
-          type: svc.type,
-          icon: svc.icon,
-          price: svc.price,
-          eta: svc.eta,
-          quantity: 1,
-        });
-      }
+
+    setSelectedService(svc);
+    if (!isInCart(svc.id)) {
+      addItem({
+        id: svc.id,
+        name: svc.name,
+        nameKey: svc.nameKey,
+        type: svc.type,
+        icon: svc.icon,
+        price: svc.price,
+        eta: svc.eta,
+        quantity: 1,
+      });
     }
   };
 
   const handleEmergencyDispatch = async () => {
     if (!selectedService) return;
-    if (!user) {
-      navigate(`/auth?redirect=${encodeURIComponent('/services')}`);
+    if (!isAuthenticated || !user) {
+      cacheIntentAndRedirect(selectedService);
       return;
     }
 
@@ -323,6 +349,10 @@ export default function ServicesPage() {
 
   const handleCheckout = () => {
     if (!selectedService) return;
+    if (!isAuthenticated || !user) {
+      cacheIntentAndRedirect(selectedService);
+      return;
+    }
     if (!isInCart(selectedService.id)) {
       addItem({
         id: selectedService.id,
@@ -335,12 +365,9 @@ export default function ServicesPage() {
         quantity: 1,
       });
     }
-    if (!user) {
-      navigate('/auth', { state: { from: { pathname: '/services' }, service: selectedService } });
-      return;
-    }
     navigate('/payment', { state: { service: selectedService } });
   };
+
 
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
@@ -497,6 +524,10 @@ export default function ServicesPage() {
                       </button>
                       <button
                         onClick={() => {
+                          if (!isAuthenticated) {
+                            cacheIntentAndRedirect(service);
+                            return;
+                          }
                           if (isInCart(service.id)) {
                             removeItem(service.id);
                             toast.success(t('cart.removedToast', `Removed ${service.name} from cart`));
@@ -580,6 +611,10 @@ export default function ServicesPage() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={() => {
+                    if (!isAuthenticated) {
+                      cacheIntentAndRedirect(selectedService);
+                      return;
+                    }
                     if (isInCart(selectedService.id)) {
                       removeItem(selectedService.id);
                       toast.success(t('cart.removedToast', `Removed ${selectedService.name} from cart`));

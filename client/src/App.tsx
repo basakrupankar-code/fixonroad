@@ -477,6 +477,7 @@ function ScrollToTop() {
 
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./components/ProtectedRoute";
+import CustomerRoute from "./components/CustomerRoute";
 import OrderTrackGuard from "./components/OrderTrackGuard";
 import TrackingPage from "./pages/TrackingPage";
 import OrdersPage from "./pages/OrdersPage";
@@ -521,33 +522,32 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<RiderLanding />} />
                 <Route path="/mechanic" element={<MechanicLanding />} />
+                <Route path="/for-mechanics" element={<Navigate to="/mechanic" replace />} />
                 <Route path="/auth" element={<AuthPage />} />
-                <Route 
-                  path="/services" 
-                  element={
-                    <ProtectedRoute allowedRoles={['customer']}>
-                      <ServicesPage />
-                    </ProtectedRoute>
-                  } 
-                />
+                <Route path="/signin" element={<AuthPage />} />
+                <Route path="/services" element={<ServicesPage />} />
                 <Route 
                   path="/cart" 
-                  element={<CartPage />} 
+                  element={
+                    <CustomerRoute>
+                      <CartPage />
+                    </CustomerRoute>
+                  } 
                 />
                 <Route 
                   path="/checkout" 
                   element={
-                    <ProtectedRoute allowedRoles={['customer']}>
+                    <CustomerRoute>
                       <Navigate to="/payment" replace />
-                    </ProtectedRoute>
+                    </CustomerRoute>
                   } 
                 />
                 <Route 
                   path="/payment" 
                   element={
-                    <ProtectedRoute allowedRoles={['customer']}>
+                    <CustomerRoute>
                       <PaymentPage />
-                    </ProtectedRoute>
+                    </CustomerRoute>
                   } 
                 />
                 <Route 
@@ -592,6 +592,14 @@ export default function App() {
                 />
                 <Route path="/partner/auth" element={<PartnerAuth />} />
                 <Route path="/partner" element={<Navigate to="/partner/auth" replace />} />
+                <Route 
+                  path="/mechanic/dashboard" 
+                  element={
+                    <ProtectedRoute allowedRoles={['mechanic']}>
+                      <MechanicPortal />
+                    </ProtectedRoute>
+                  } 
+                />
                 <Route 
                   path="/mechanic-dashboard" 
                   element={

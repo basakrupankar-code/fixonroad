@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Wrench, ArrowRight, ChevronLeft, CarFront, Mail, User as UserIcon, MapPin, Calendar, Eye, EyeOff, Wand2, Phone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCart, PENDING_CART_INTENT_KEY } from '../context/CartContext';
 import { useTranslation } from 'react-i18next';
 import { signInWithPopup } from 'firebase/auth';
 import { auth as firebaseAuth, googleProvider, isFirebaseConfigured, getFirebaseErrorMessage } from '../lib/firebase';
@@ -20,6 +21,7 @@ export default function AuthPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { hydratePendingIntent } = useCart();
 
   useEffect(() => {
     if (searchParams.get('role') === 'mechanic') {
@@ -50,6 +52,36 @@ export default function AuthPage() {
     document.title = 'Join FixOnRoad — Roadside Assistance';
   }, []);
 
+  const handlePostAuthRedirect = (userData: any) => {
+    login(userData);
+
+    // If user logged in under mechanic role, deny customer dispatch cart access
+    if (userData?.role === 'mechanic') {
+      sessionStorage.removeItem(PENDING_CART_INTENT_KEY);
+      const redirectUrl = searchParams.get('redirect');
+      if (redirectUrl === '/cart' || redirectUrl === '/checkout') {
+        toast.error('Cart and roadside dispatch are only accessible to customer accounts.', {
+          id: 'mechanic-cart-denied'
+        });
+      }
+      navigate('/mechanic-dashboard', { replace: true });
+      return;
+    }
+
+    // Customer role: check and hydrate any pending breakdown assistance intent
+    const hasHydratedIntent = hydratePendingIntent();
+    const redirectUrl = searchParams.get('redirect') || (location.state as any)?.from?.pathname;
+    const serviceId = searchParams.get('serviceId');
+
+    if (hasHydratedIntent || redirectUrl === '/cart') {
+      navigate('/cart');
+    } else if (redirectUrl) {
+      navigate(redirectUrl + (serviceId ? `?serviceId=${serviceId}` : ''));
+    } else {
+      navigate('/services');
+    }
+  };
+
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -66,22 +98,14 @@ export default function AuthPage() {
         body: JSON.stringify({ email, password })
       });
 
-      login(data.user);
-      
-      const redirectUrl = searchParams.get('redirect') || (location.state as any)?.from?.pathname;
-      const serviceId = searchParams.get('serviceId');
-      
-      if (redirectUrl) {
-        navigate(redirectUrl + (serviceId ? `?serviceId=${serviceId}` : ''));
-      } else {
-        navigate('/services');
-      }
+      handlePostAuthRedirect(data.user);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       setIsLoading(false);
     }
   };
+
 
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
@@ -191,16 +215,7 @@ export default function AuthPage() {
         body: JSON.stringify({ idToken, role: 'customer' })
       });
 
-      login(data.user);
-      
-      const redirectUrl = searchParams.get('redirect') || (location.state as any)?.from?.pathname;
-      const serviceId = searchParams.get('serviceId');
-      
-      if (redirectUrl) {
-        navigate(redirectUrl + (serviceId ? `?serviceId=${serviceId}` : ''));
-      } else {
-        navigate('/services');
-      }
+      handlePostAuthRedirect(data.user);
     } catch (err: any) {
       console.error('Customer Google Login Error:', err);
       if (err.code === 'auth/popup-closed-by-user') {

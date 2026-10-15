@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { Session } from '../models/Session';
 import { User } from '../models/User';
+import { verifyToken } from '../utils/jwt';
 
 // Extend Express Request interface to include user
 declare global {
@@ -108,3 +109,65 @@ export const optionalAuth = async (req: Request, _res: Response, next: NextFunct
     next();
   }
 };
+
+export const verifyCartAuth = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    let token = req.cookies?.session_token;
+    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    let userId: string | undefined;
+    let role: string | undefined;
+
+    // 1. Try JWT verification first
+    try {
+      const decoded = verifyToken(token);
+      if (decoded && decoded.userId) {
+        userId = decoded.userId;
+        role = decoded.role;
+      }
+    } catch {
+      // Fallback to session check
+    }
+
+    // 2. Try DB session lookup if not resolved from JWT
+    if (!userId) {
+      const session = await Session.findOne({ sessionToken: token });
+      if (session && session.expiresAt >= new Date()) {
+        userId = session.userId.toString();
+        role = session.role;
+      }
+    }
+
+    if (!userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    req.user = {
+      _id: userId,
+      userId,
+      role: role || 'customer'
+    };
+
+    next();
+  } catch (error) {
+    console.error('Cart auth middleware error:', error);
+    return res.status(401).json({ error: "Authentication required" });
+  }
+};
+
+export const requireCustomerCartRole = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  if (req.user.role !== 'customer') {
+    return res.status(403).json({ error: "Forbidden: Only customer accounts can create roadside dispatch carts" });
+  }
+  next();
+};
+
